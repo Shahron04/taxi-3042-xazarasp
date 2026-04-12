@@ -1,0 +1,4 @@
+1. Нажми "Add file"
+2. "Create new file"
+3. Имя файла: runtime.txt
+4. Содержимое:
