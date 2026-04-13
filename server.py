@@ -13,7 +13,7 @@ from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
 
-from flask import (Flask, render_template, request,
+from flask import (Flask, render_template_string, request,
                    redirect, url_for, session, jsonify)
 
 import os
@@ -37,6 +37,7 @@ def get_db():
     return conn
 
 def init_db():
+    print("🔧 Инициализация базы данных...")
     conn = get_db()
     c = conn.cursor()
     c.execute("""
@@ -75,6 +76,7 @@ def init_db():
     """)
     conn.commit()
     conn.close()
+    print("✅ База данных готова")
 
 def generate_pin():
     return str(random.randint(1000, 9999))
@@ -694,6 +696,289 @@ def admin_required(f):
         return f(*args, **kwargs)
     return decorated
 
+# ---------- HTML ШАБЛОНЫ (встроенные) ----------
+LOGIN_HTML = '''
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Вход в админку</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="bg-light">
+    <div class="container mt-5">
+        <div class="row justify-content-center">
+            <div class="col-md-4">
+                <div class="card shadow">
+                    <div class="card-header bg-primary text-white">
+                        <h4 class="mb-0">Вход в панель управления</h4>
+                    </div>
+                    <div class="card-body">
+                        {% if error %}
+                            <div class="alert alert-danger">{{ error }}</div>
+                        {% endif %}
+                        <form method="post">
+                            <div class="mb-3">
+                                <label class="form-label">Логин</label>
+                                <input type="text" name="username" class="form-control" required>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Пароль</label>
+                                <input type="password" name="password" class="form-control" required>
+                            </div>
+                            <button type="submit" class="btn btn-primary w-100">Войти</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
+'''
+
+DASHBOARD_HTML = '''
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Дашборд | Админка такси</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+    <nav class="navbar navbar-dark bg-dark">
+        <div class="container-fluid">
+            <span class="navbar-brand">🚖 Админ-панель такси</span>
+            <a href="/logout" class="btn btn-outline-light">Выйти</a>
+        </div>
+    </nav>
+    <div class="container mt-4">
+        <h2>Главная</h2>
+        <div class="row mt-4">
+            <div class="col-md-3 mb-3">
+                <div class="card text-white bg-primary">
+                    <div class="card-body">
+                        <h5 class="card-title">Всего водителей</h5>
+                        <h2>{{ stats.total }}</h2>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 mb-3">
+                <div class="card text-white bg-success">
+                    <div class="card-body">
+                        <h5 class="card-title">Одобрено</h5>
+                        <h2>{{ stats.approved }}</h2>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 mb-3">
+                <div class="card text-white bg-warning">
+                    <div class="card-body">
+                        <h5 class="card-title">Ожидают</h5>
+                        <h2>{{ stats.pending }}</h2>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 mb-3">
+                <div class="card text-white bg-danger">
+                    <div class="card-body">
+                        <h5 class="card-title">Заблокировано</h5>
+                        <h2>{{ stats.blocked }}</h2>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="row mt-2">
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-body">
+                        <h5><i class="fas fa-list"></i> Заявки</h5>
+                        <p>Новых: {{ stats.pending }}</p>
+                        <a href="/requests" class="btn btn-sm btn-primary">Просмотреть</a>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-body">
+                        <h5><i class="fas fa-users"></i> Водители</h5>
+                        <p>Всего: {{ stats.total }}</p>
+                        <a href="/drivers" class="btn btn-sm btn-primary">Список</a>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-body">
+                        <h5><i class="fas fa-chart-line"></i> Статистика</h5>
+                        <p>Подробные отчёты</p>
+                        <a href="/stats" class="btn btn-sm btn-primary">Перейти</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
+'''
+
+DRIVERS_HTML = '''
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Водители</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+    <nav class="navbar navbar-dark bg-dark">
+        <div class="container-fluid">
+            <a href="/" class="navbar-brand">🚖 Назад</a>
+            <a href="/logout" class="btn btn-outline-light">Выйти</a>
+        </div>
+    </nav>
+    <div class="container mt-4">
+        <h2>Список водителей</h2>
+        <form method="get" class="mb-3">
+            <div class="input-group">
+                <input type="text" name="search" class="form-control" placeholder="Поиск по имени, машине, телефону..." value="{{ search }}">
+                <button class="btn btn-primary" type="submit">Найти</button>
+            </div>
+        </form>
+        <table class="table table-bordered">
+            <thead>
+                <tr><th>ID</th><th>Имя</th><th>Машина</th><th>Телефон</th><th>Статус</th><th>PIN</th><th>Действия</th></tr>
+            </thead>
+            <tbody>
+                {% for d in drivers %}
+                <tr>
+                    <td>{{ d.id }}</td><td>{{ d.full_name }}</td><td>{{ d.car_number }}</td><td>{{ d.phone }}</td>
+                    <td>{% if d.status == 'approved' %}✅ Одобрен{% elif d.status == 'pending' %}⏳ Ожидает{% else %}❌ Отклонён{% endif %} {% if d.is_blocked %}🚫{% endif %}</td>
+                    <td>{{ d.pin or '-' }}</td>
+                    <td>
+                        <a href="/block/{{ d.tg_id }}" class="btn btn-sm btn-danger" onclick="return confirm('Блокировать?')">Блок</a>
+                        <a href="/unblock/{{ d.tg_id }}" class="btn btn-sm btn-success" onclick="return confirm('Разблокировать?')">Разблок</a>
+                        <a href="/reset_pin/{{ d.tg_id }}" class="btn btn-sm btn-warning">Сброс PIN</a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</body>
+</html>
+'''
+
+REQUESTS_HTML = '''
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Заявки</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+    <nav class="navbar navbar-dark bg-dark">
+        <div class="container-fluid">
+            <a href="/" class="navbar-brand">🚖 Назад</a>
+            <a href="/logout" class="btn btn-outline-light">Выйти</a>
+        </div>
+    </nav>
+    <div class="container mt-4">
+        <h2>Новые заявки</h2>
+        {% if drivers %}
+            <table class="table">
+                <thead><tr><th>Имя</th><th>Телефон</th><th>Авто</th><th>Действия</th></tr></thead>
+                <tbody>
+                {% for d in drivers %}
+                <tr><td>{{ d.full_name }}</td><td>{{ d.phone }}</td><td>{{ d.car_number }}</td>
+                    <td><a href="/approve/{{ d.tg_id }}" class="btn btn-sm btn-success">Одобрить</a>
+                        <a href="/reject/{{ d.tg_id }}" class="btn btn-sm btn-danger">Отклонить</a></td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <div class="alert alert-info">Нет новых заявок</div>
+        {% endif %}
+    </div>
+</body>
+</html>
+'''
+
+STATS_HTML = '''
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Статистика</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+    <nav class="navbar navbar-dark bg-dark">
+        <div class="container-fluid">
+            <a href="/" class="navbar-brand">🚖 Назад</a>
+            <a href="/logout" class="btn btn-outline-light">Выйти</a>
+        </div>
+    </nav>
+    <div class="container mt-4">
+        <h2>Статистика</h2>
+        <ul class="list-group mb-4">
+            <li class="list-group-item">Всего: {{ stats.total }}</li>
+            <li class="list-group-item">Одобрено: {{ stats.approved }}</li>
+            <li class="list-group-item">Ожидают: {{ stats.pending }}</li>
+            <li class="list-group-item">Отклонено: {{ stats.rejected }}</li>
+            <li class="list-group-item">Заблокировано: {{ stats.blocked }}</li>
+            <li class="list-group-item">Сегодня: {{ stats.today }}</li>
+        </ul>
+        <h3>Последние логи</h3>
+        <table class="table table-sm">
+            <thead><tr><th>Время</th><th>Действие</th><th>Детали</th></tr></thead>
+            <tbody>
+                {% for log in logs %}
+                <tr><td>{{ log.created_at }}</td><td>{{ log.action }}</td><td>{{ log.details }}</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</body>
+</html>
+'''
+
+BROADCAST_HTML = '''
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Рассылка</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+    <nav class="navbar navbar-dark bg-dark">
+        <div class="container-fluid">
+            <a href="/" class="navbar-brand">🚖 Назад</a>
+            <a href="/logout" class="btn btn-outline-light">Выйти</a>
+        </div>
+    </nav>
+    <div class="container mt-4">
+        <h2>Рассылка сообщений водителям</h2>
+        {% if success %}
+            <div class="alert alert-success">✅ Отправлено: {{ sent }}, ошибок: {{ failed }}</div>
+        {% endif %}
+        <form method="post">
+            <div class="mb-3">
+                <label class="form-label">Текст сообщения</label>
+                <textarea name="message" rows="5" class="form-control" required></textarea>
+            </div>
+            <button type="submit" class="btn btn-primary">Отправить</button>
+        </form>
+    </div>
+</body>
+</html>
+'''
+
 @flask_app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
@@ -701,9 +986,8 @@ def login():
                 request.form.get('password') == ADMIN_PASSWORD):
             session['admin'] = True
             return redirect(url_for('dashboard'))
-        return render_template('login.html',
-                               error="Неверный логин или пароль")
-    return render_template('login.html')
+        return render_template_string(LOGIN_HTML, error="Неверный логин или пароль")
+    return render_template_string(LOGIN_HTML)
 
 @flask_app.route('/logout')
 def logout():
@@ -713,22 +997,19 @@ def logout():
 @flask_app.route('/')
 @admin_required
 def dashboard():
-    return render_template('dashboard.html', stats=get_stats())
+    return render_template_string(DASHBOARD_HTML, stats=get_stats())
 
 @flask_app.route('/drivers')
 @admin_required
 def drivers():
     query = request.args.get('search', '')
     drivers_list = search_drivers(query) if query else get_all_drivers()
-    return render_template('drivers.html',
-                           drivers=drivers_list,
-                           search=query)
+    return render_template_string(DRIVERS_HTML, drivers=drivers_list, search=query)
 
 @flask_app.route('/requests')
 @admin_required
 def requests_page():
-    return render_template('requests.html',
-                           drivers=get_pending_drivers())
+    return render_template_string(REQUESTS_HTML, drivers=get_pending_drivers())
 
 @flask_app.route('/approve/<int:tg_id>')
 @admin_required
@@ -768,9 +1049,7 @@ def web_reset_pin(tg_id):
 @flask_app.route('/stats')
 @admin_required
 def stats():
-    return render_template('stats.html',
-                           stats=get_stats(),
-                           logs=get_logs())
+    return render_template_string(STATS_HTML, stats=get_stats(), logs=get_logs())
 
 @flask_app.route('/broadcast', methods=['GET', 'POST'])
 @admin_required
@@ -794,14 +1073,10 @@ def broadcast():
                         failed += 1
         asyncio.run(send_all())
         save_broadcast(msg, sent)
-        return render_template('broadcast.html',
-                               success=True,
-                               sent=sent,
-                               failed=failed)
-    return render_template('broadcast.html')
+        return render_template_string(BROADCAST_HTML, success=True, sent=sent, failed=failed)
+    return render_template_string(BROADCAST_HTML)
 
 # ==================== API для APK ====================
-
 @flask_app.route('/api/driver/register', methods=['POST'])
 def api_register():
     try:
@@ -811,67 +1086,33 @@ def api_register():
         phone = data.get('phone', '').strip()
 
         if not name or not car_number:
-            return jsonify({
-                "success": False,
-                "error": "Заполните все поля"
-            }), 400
+            return jsonify({"success": False, "error": "Заполните все поля"}), 400
 
         driver = get_driver_by_car(car_number)
-
         if driver:
             if driver['status'] == 'approved':
-                return jsonify({
-                    "success": False,
-                    "error": "Вы уже зарегистрированы"
-                }), 200
+                return jsonify({"success": False, "error": "Вы уже зарегистрированы"}), 200
             elif driver['status'] == 'pending':
-                return jsonify({
-                    "success": False,
-                    "error": "Заявка уже отправлена"
-                }), 200
+                return jsonify({"success": False, "error": "Заявка уже отправлена"}), 200
             elif driver['status'] == 'rejected':
-                return jsonify({
-                    "success": False,
-                    "error": "Ваша заявка отклонена"
-                }), 200
+                return jsonify({"success": False, "error": "Ваша заявка отклонена"}), 200
 
-        add_driver(
-            tg_id=0,
-            username=name,
-            full_name=name,
-            phone=phone,
-            car_number=car_number
-        )
+        add_driver(tg_id=0, username=name, full_name=name, phone=phone, car_number=car_number)
 
         async def notify():
             for admin_id in ADMIN_IDS:
                 try:
                     await bot.send_message(
                         admin_id,
-                        f"🆕 Новая заявка из APK!\n\n"
-                        f"👤 Имя: {name}\n"
-                        f"🚗 Авто: {car_number}\n"
-                        f"📱 Device: {phone}\n\n"
-                        f"✅ /approve_car_{car_number}\n"
-                        f"❌ /reject_car_{car_number}"
+                        f"🆕 Новая заявка из APK!\n\n👤 Имя: {name}\n🚗 Авто: {car_number}\n📱 Device: {phone}\n\n✅ /approve_car_{car_number}\n❌ /reject_car_{car_number}"
                     )
                 except:
                     pass
-
         asyncio.run(notify())
-
-        return jsonify({
-            "success": True,
-            "message": "Заявка отправлена! Ожидайте PIN"
-        }), 200
-
+        return jsonify({"success": True, "message": "Заявка отправлена! Ожидайте PIN"}), 200
     except Exception as e:
         logging.error(f"Register error: {e}")
-        return jsonify({
-            "success": False,
-            "error": "Ошибка сервера"
-        }), 500
-
+        return jsonify({"success": False, "error": "Ошибка сервера"}), 500
 
 @flask_app.route('/api/driver/login', methods=['POST'])
 def api_login():
@@ -879,77 +1120,38 @@ def api_login():
         data = request.get_json()
         car_number = data.get('car_number', '').strip().upper()
         pin = data.get('pin', '').strip()
-
         if not car_number or not pin:
-            return jsonify({
-                "success": False,
-                "error": "Заполните все поля"
-            }), 400
-
+            return jsonify({"success": False, "error": "Заполните все поля"}), 400
         driver = get_driver_by_car(car_number)
-
         if not driver:
-            return jsonify({
-                "success": False,
-                "error": "Водитель не найден"
-            }), 404
-
+            return jsonify({"success": False, "error": "Водитель не найден"}), 404
         if driver['is_blocked']:
-            return jsonify({
-                "success": False,
-                "error": "Аккаунт заблокирован"
-            }), 403
-
+            return jsonify({"success": False, "error": "Аккаунт заблокирован"}), 403
         if driver['status'] != 'approved':
-            return jsonify({
-                "success": False,
-                "error": "Заявка ещё не одобрена"
-            }), 403
-
+            return jsonify({"success": False, "error": "Заявка ещё не одобрена"}), 403
         if driver['pin'] != pin:
-            return jsonify({
-                "success": False,
-                "error": "Неверный PIN код"
-            }), 401
-
+            return jsonify({"success": False, "error": "Неверный PIN код"}), 401
         return jsonify({
             "success": True,
-            "driver": {
-                "id":      driver['id'],
-                "name":    driver['full_name'],
-                "car":     driver['car_number'],
-                "balance": 0.0
-            }
+            "driver": {"id": driver['id'], "name": driver['full_name'], "car": driver['car_number'], "balance": 0.0}
         }), 200
-
     except Exception as e:
         logging.error(f"Login error: {e}")
-        return jsonify({
-            "success": False,
-            "error": "Ошибка сервера"
-        }), 500
+        return jsonify({"success": False, "error": "Ошибка сервера"}), 500
 
 # ==================== ЗАПУСК ====================
-
 def run_bot():
     async def start_bot():
         logging.basicConfig(level=logging.INFO)
         await dp.start_polling(bot)
     asyncio.run(start_bot())
 
-# Псевдоним для gunicorn
 app = flask_app
-
-# === ИСПРАВЛЕНИЕ: создаём таблицы при загрузке модуля ===
+# ГАРАНТИРОВАННАЯ ИНИЦИАЛИЗАЦИЯ БД
 init_db()
-# ====================================================
 
 if __name__ == "__main__":
     bot_thread = threading.Thread(target=run_bot)
     bot_thread.daemon = True
     bot_thread.start()
-    flask_app.run(
-        host='0.0.0.0',
-        port=PORT,
-        debug=False
-    )
+    flask_app.run(host='0.0.0.0', port=PORT, debug=False)
