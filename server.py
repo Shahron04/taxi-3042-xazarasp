@@ -19,11 +19,14 @@ from flask import (Flask, render_template, request,
 import os
 
 # ==================== НАСТРОЙКИ ====================
-BOT_TOKEN = os.environ.get("BOT_TOKEN", "ВАШ_ТОКЕН")
-ADMIN_IDS = [int(x) for x in os.environ.get("ADMIN_IDS", "123456789").split(",")]
-ADMIN_USERNAME = os.environ.get("ADMIN_USERNAME", "admin")
-ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "admin123")
-SECRET_KEY = os.environ.get("SECRET_KEY", "taxi2024secret")
+BOT_TOKEN = "8671480651:AAHxDVRUfULTSZRPMMvJ7NO5TfbSS1GqHiQ".strip()
+if not BOT_TOKEN:
+    raise ValueError("BOT_TOKEN is missing or empty")
+
+ADMIN_IDS = [int(x.strip()) for x in os.environ.get("ADMIN_IDS", "123456789").split(",") if x.strip()]
+ADMIN_USERNAME = os.environ.get("ADMIN_USERNAME", "admin").strip()
+ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "admin123").strip()
+SECRET_KEY = os.environ.get("SECRET_KEY", "taxi2024secret").strip()
 PIN_EXPIRE_DAYS = 30
 PORT = int(os.environ.get("PORT", 5000))
 
