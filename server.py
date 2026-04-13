@@ -940,8 +940,11 @@ def run_bot():
 # Псевдоним для gunicorn
 app = flask_app
 
+# === ИСПРАВЛЕНИЕ: создаём таблицы при загрузке модуля ===
+init_db()
+# ====================================================
+
 if __name__ == "__main__":
-    init_db()
     bot_thread = threading.Thread(target=run_bot)
     bot_thread.daemon = True
     bot_thread.start()
