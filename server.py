@@ -621,7 +621,7 @@ async def reset_pin_cmd(message: types.Message):
         pass
 
 # ==================== FLASK ====================
-flask_app = Flask(__name__)
+flask_app = Flask(__name__, template_folder='.')
 flask_app.secret_key = SECRET_KEY
 
 def admin_required(f):
