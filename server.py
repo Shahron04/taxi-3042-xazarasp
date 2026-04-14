@@ -824,6 +824,7 @@ def api_login():
         logging.error(f"Login error: {e}")
         return jsonify({"success": False, "error": "Ошибка сервера"}), 500
 
+
 # ==================== ЗАПУСК ====================
 
 def run_bot():
@@ -832,12 +833,17 @@ def run_bot():
         await dp.start_polling(bot)
     asyncio.run(start_bot())
 
-# Псевдоним для gunicorn
+
+# ✅ Инициализация БД (вызывается при запуске gunicorn)
+init_db()
+
+# ✅ Запуск бота в отдельном потоке
+bot_thread = threading.Thread(target=run_bot)
+bot_thread.daemon = True
+bot_thread.start()
+
+# ✅ Псевдоним для gunicorn
 app = flask_app
 
 if __name__ == "__main__":
-    init_db()
-    bot_thread = threading.Thread(target=run_bot)
-    bot_thread.daemon = True
-    bot_thread.start()
     flask_app.run(host='0.0.0.0', port=PORT, debug=False)
