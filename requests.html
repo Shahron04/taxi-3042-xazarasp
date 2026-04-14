@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Заявки</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { background: #1a1a1a; font-family: Arial, sans-serif; color: #fff; }
+        .header {
+            background: #2a2a2a;
+            padding: 16px 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 2px solid #FAD201;
+        }
+        .header h1 { color: #FAD201; }
+        .nav a { color: #fff; text-decoration: none; margin-left: 20px; }
+        .nav a:hover { color: #FAD201; }
+        .content { padding: 30px; }
+        .card {
+            background: #2a2a2a;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .card-info p { color: #888; font-size: 14px; margin-top: 4px; }
+        .card-info h3 { color: #fff; font-size: 18px; }
+        .card-info .car {
+            color: #FAD201;
+            font-size: 20px;
+            font-weight: bold;
+        }
+        .actions { display: flex; gap: 10px; }
+        .btn-approve {
+            padding: 12px 24px;
+            background: #4CAF50;
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            font-weight: bold;
+            cursor: pointer;
+            text-decoration: none;
+            font-size: 15px;
+        }
+        .btn-reject {
+            padding: 12px 24px;
+            background: #f44336;
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            font-weight: bold;
+            cursor: pointer;
+            text-decoration: none;
+            font-size: 15px;
+        }
+        .empty {
+            text-align: center;
+            color: #888;
+            padding: 60px;
+            font-size: 18px;
+        }
+        .logout { color: #ff4444; text-decoration: none; margin-left: 20px; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🚕 TAXI 3042</h1>
+        <div class="nav">
+            <a href="/">🏠 Главная</a>
+            <a href="/drivers">👥 Водители</a>
+            <a href="/stats">📊 Статистика</a>
+            <a href="/logout" class="logout">Выйти</a>
+        </div>
+    </div>
+    <div class="content">
+        <h2 style="margin-bottom:24px;">📝 Заявки на регистрацию</h2>
+        {% if drivers %}
+            {% for driver in drivers %}
+            <div class="card">
+                <div class="card-info">
+                    <h3>{{ driver.full_name }}</h3>
+                    <div class="car">🚗 {{ driver.car_number }}</div>
+                    <p>📱 {{ driver.phone }}</p>
+                    <p>📅 {{ driver.created_at[:16] }}</p>
+                </div>
+                <div class="actions">
+                    <a href="/approve/{{ driver.tg_id }}" class="btn-approve">✅ Одобрить</a>
+                    <a href="/reject/{{ driver.tg_id }}"  class="btn-reject">❌ Отклонить</a>
+                </div>
+            </div>
+            {% endfor %}
+        {% else %}
+            <div class="empty">📭 Нет новых заявок</div>
+        {% endif %}
+    </div>
+</body>
+</html>
