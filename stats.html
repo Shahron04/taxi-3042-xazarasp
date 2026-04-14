@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Статистика</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { background: #1a1a1a; font-family: Arial, sans-serif; color: #fff; }
+        .header {
+            background: #2a2a2a;
+            padding: 16px 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 2px solid #FAD201;
+        }
+        .header h1 { color: #FAD201; }
+        .nav a { color: #fff; text-decoration: none; margin-left: 20px; }
+        .content { padding: 30px; }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        th {
+            background: #2a2a2a;
+            padding: 12px;
+            text-align: left;
+            color: #FAD201;
+        }
+        td { padding: 12px; border-bottom: 1px solid #333; font-size: 13px; }
+        tr:hover td { background: #2a2a2a; }
+        .logout { color: #ff4444; text-decoration: none; margin-left: 20px; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🚕 TAXI 3042</h1>
+        <div class="nav">
+            <a href="/">🏠 Главная</a>
+            <a href="/drivers">👥 Водители</a>
+            <a href="/requests">📝 Заявки</a>
+            <a href="/logout" class="logout">Выйти</a>
+        </div>
+    </div>
+    <div class="content">
+        <h2>📊 Логи действий</h2>
+        <table>
+            <tr>
+                <th>Действие</th>
+                <th>Водитель ID</th>
+                <th>Детали</th>
+                <th>Дата</th>
+            </tr>
+            {% for log in logs %}
+            <tr>
+                <td>{{ log.action }}</td>
+                <td>{{ log.driver_id }}</td>
+                <td>{{ log.details }}</td>
+                <td style="color:#888;">{{ log.created_at[:16] }}</td>
+            </tr>
+            {% endfor %}
+        </table>
+    </div>
+</body>
+</html>
