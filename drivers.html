@@ -2,22 +2,54 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>Водители</title>
+    <title>Водители — TAXI 3042</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { background: #1a1a1a; font-family: Arial, sans-serif; color: #fff; }
+        body { background: #0f0f0f; font-family: Arial, sans-serif; color: #fff; }
+
+        /* HEADER */
         .header {
-            background: #2a2a2a;
+            background: #1a1a1a;
             padding: 16px 24px;
             display: flex;
             justify-content: space-between;
             align-items: center;
             border-bottom: 2px solid #FAD201;
+            position: sticky;
+            top: 0;
+            z-index: 100;
         }
-        .header h1 { color: #FAD201; }
-        .nav a { color: #fff; text-decoration: none; margin-left: 20px; }
+        .header h1 { color: #FAD201; font-size: 20px; }
+        .nav a {
+            color: #aaa;
+            text-decoration: none;
+            margin-left: 20px;
+            font-size: 14px;
+            transition: color 0.2s;
+        }
         .nav a:hover { color: #FAD201; }
-        .content { padding: 30px; }
+        .logout { color: #ff4444 !important; }
+
+        /* CONTENT */
+        .content { padding: 30px; max-width: 1600px; margin: 0 auto; }
+
+        /* TITLE */
+        .page-title {
+            font-size: 22px;
+            font-weight: bold;
+            color: #fff;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .page-title span {
+            font-size: 13px;
+            color: #555;
+            font-weight: normal;
+        }
+
+        /* SEARCH */
         .search-form {
             display: flex;
             gap: 10px;
@@ -25,13 +57,16 @@
         }
         .search-form input {
             flex: 1;
-            padding: 12px;
-            background: #2a2a2a;
-            border: 1px solid #444;
+            padding: 12px 16px;
+            background: #1a1a1a;
+            border: 1px solid #333;
             border-radius: 8px;
             color: #fff;
-            font-size: 15px;
+            font-size: 14px;
+            outline: none;
+            transition: border 0.2s;
         }
+        .search-form input:focus { border-color: #FAD201; }
         .search-form button {
             padding: 12px 24px;
             background: #FAD201;
@@ -40,82 +75,233 @@
             border-radius: 8px;
             font-weight: bold;
             cursor: pointer;
+            font-size: 14px;
+            transition: opacity 0.2s;
+        }
+        .search-form button:hover { opacity: 0.85; }
+
+        /* TABLE */
+        .table-wrap {
+            background: #1a1a1a;
+            border-radius: 12px;
+            overflow: hidden;
+            border: 1px solid #2a2a2a;
+            overflow-x: auto;
         }
         table {
             width: 100%;
             border-collapse: collapse;
+            min-width: 900px;
         }
         th {
-            background: #2a2a2a;
-            padding: 12px;
+            background: #222;
+            padding: 14px 16px;
             text-align: left;
             color: #FAD201;
-            font-size: 13px;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            white-space: nowrap;
         }
         td {
-            padding: 12px;
-            border-bottom: 1px solid #333;
-            font-size: 14px;
+            padding: 14px 16px;
+            border-bottom: 1px solid #222;
+            font-size: 13px;
+            color: #ccc;
+            vertical-align: middle;
         }
-        tr:hover td { background: #2a2a2a; }
+        tr:last-child td { border-bottom: none; }
+        tr:hover td { background: #222; }
+
+        /* BADGES — статус регистрации */
         .badge {
-            padding: 4px 10px;
+            display: inline-block;
+            padding: 4px 12px;
             border-radius: 20px;
-            font-size: 12px;
+            font-size: 11px;
             font-weight: bold;
+            white-space: nowrap;
         }
         .badge-approved { background: #1b5e20; color: #4CAF50; }
         .badge-pending  { background: #e65100; color: #ff9800; }
         .badge-rejected { background: #b71c1c; color: #f44336; }
+        .badge-blocked  { background: #2a2a2a; color: #ff4444; }
+
+        /* BADGES — онлайн статус */
+        .online-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            padding: 3px 10px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: bold;
+            white-space: nowrap;
+        }
+        .online-badge .dot {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+        }
+        .online-online  { background: #0d2a1a; color: #22c97a; }
+        .online-online .dot  { background: #22c97a; }
+        .online-free    { background: #0d2a1a; color: #22c97a; }
+        .online-free .dot    { background: #22c97a; }
+        .online-busy    { background: #2a1a0d; color: #f59e0b; }
+        .online-busy .dot    { background: #f59e0b; }
+        .online-offline { background: #1a1a1a; color: #555; }
+        .online-offline .dot { background: #555; }
+
+        /* BUTTONS */
         .btn {
+            display: inline-block;
             padding: 6px 12px;
             border-radius: 6px;
             border: none;
             cursor: pointer;
             font-size: 12px;
+            font-weight: bold;
             text-decoration: none;
             margin-right: 4px;
+            transition: opacity 0.2s;
+            white-space: nowrap;
         }
-        .btn-block   { background: #f44336; color: #fff; }
-        .btn-unblock { background: #4CAF50; color: #fff; }
-        .btn-reset   { background: #ff9800; color: #000; }
-        .logout { color: #ff4444; text-decoration: none; margin-left: 20px; }
+        .btn:hover { opacity: 0.8; }
+        .btn-block   { background: #b71c1c; color: #fff; }
+        .btn-unblock { background: #1b5e20; color: #4CAF50; border: 1px solid #4CAF50; }
+        .btn-reset   { background: #e65100; color: #fff; }
+
+        /* BALANCE */
+        .balance {
+            color: #22c97a;
+            font-weight: bold;
+        }
+        .balance.zero { color: #444; }
+
+        /* PIN */
+        .pin-code {
+            color: #FAD201;
+            font-weight: bold;
+            font-size: 16px;
+            letter-spacing: 2px;
+        }
+
+        /* EMPTY */
+        .empty {
+            text-align: center;
+            padding: 80px;
+            color: #444;
+        }
+        .empty .icon { font-size: 48px; margin-bottom: 12px; }
+        .empty p { font-size: 14px; }
+
+        /* COUNTER */
+        .counter {
+            display: inline-block;
+            background: #2a2a2a;
+            color: #FAD201;
+            padding: 2px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+            margin-left: 8px;
+        }
     </style>
 </head>
 <body>
-    <div class="header">
-        <h1>🚕 TAXI 3042</h1>
-        <div class="nav">
-            <a href="/">🏠 Главная</a>
-            <a href="/requests">📝 Заявки</a>
-            <a href="/stats">📊 Статистика</a>
-            <a href="/logout" class="logout">Выйти</a>
-        </div>
+
+<div class="header">
+    <h1>🚕 TAXI 3042</h1>
+    <div class="nav">
+        <a href="/">🏠 Главная</a>
+        <a href="/requests">📝 Заявки</a>
+        <a href="/stats">📊 Статистика</a>
+        <a href="/broadcast">📢 Рассылка</a>
+        <a href="/logout" class="logout">🚪 Выйти</a>
     </div>
-    <div class="content">
-        <h2 style="margin-bottom:20px;">👥 Все водители</h2>
-        <form class="search-form" method="GET">
-            <input name="search" value="{{ search }}" placeholder="Поиск по имени, авто, телефону..."/>
-            <button type="submit">🔍 Найти</button>
-        </form>
+</div>
+
+<div class="content">
+
+    <div class="page-title">
+        👥 Все водители
+        <span class="counter">{{ drivers|length }}</span>
+    </div>
+
+    <!-- Поиск -->
+    <form class="search-form" method="GET">
+        <input
+            name="search"
+            value="{{ search }}"
+            placeholder="🔍 Поиск по имени, авто, телефону..."
+            autocomplete="off" />
+        <button type="submit">🔍 Найти</button>
+        {% if search %}
+            <a href="/drivers" style="
+                padding: 12px 20px;
+                background: #2a2a2a;
+                color: #aaa;
+                border-radius: 8px;
+                text-decoration: none;
+                font-size: 14px;">
+                ✕ Сброс
+            </a>
+        {% endif %}
+    </form>
+
+    <!-- Таблица -->
+    <div class="table-wrap">
+        {% if drivers %}
         <table>
             <tr>
+                <th>#</th>
                 <th>Имя</th>
                 <th>Авто</th>
                 <th>Телефон</th>
                 <th>Статус</th>
                 <th>PIN</th>
-                <th>Дата</th>
+                <th>💰 Баланс</th>
+                <th>📍 Онлайн</th>
+                <th>🕐 Последний вход</th>
+                <th>📅 Дата</th>
                 <th>Действия</th>
             </tr>
             {% for driver in drivers %}
             <tr>
-                <td>{{ driver.full_name }}</td>
-                <td>{{ driver.car_number }}</td>
-                <td>{{ driver.phone }}</td>
+                <!-- Номер -->
+                <td style="color:#555;">{{ loop.index }}</td>
+
+                <!-- Имя -->
+                <td>
+                    <div style="font-weight:bold; color:#eef2f8;">
+                        {{ driver.full_name }}
+                    </div>
+                    {% if driver.username and driver.username != 'нет' %}
+                    <div style="color:#555; font-size:11px;">
+                        @{{ driver.username }}
+                    </div>
+                    {% endif %}
+                </td>
+
+                <!-- Авто -->
+                <td>
+                    <span style="
+                        background:#2a2a2a;
+                        padding: 4px 10px;
+                        border-radius: 6px;
+                        font-weight: bold;
+                        color:#eef2f8;
+                        letter-spacing: 1px;">
+                        {{ driver.car_number }}
+                    </span>
+                </td>
+
+                <!-- Телефон -->
+                <td style="color:#aaa;">{{ driver.phone or '—' }}</td>
+
+                <!-- Статус -->
                 <td>
                     {% if driver.is_blocked %}
-                        <span class="badge badge-rejected">🚫 Блок</span>
+                        <span class="badge badge-blocked">🚫 Заблокирован</span>
                     {% elif driver.status == 'approved' %}
                         <span class="badge badge-approved">✅ Одобрен</span>
                     {% elif driver.status == 'pending' %}
@@ -124,23 +310,104 @@
                         <span class="badge badge-rejected">❌ Отклонён</span>
                     {% endif %}
                 </td>
-                <td style="color:#FAD201;font-weight:bold;">
-                    {{ driver.pin or '—' }}
+
+                <!-- PIN -->
+                <td>
+                    {% if driver.pin %}
+                        <span class="pin-code">{{ driver.pin }}</span>
+                        {% if driver.pin_expires_at %}
+                        <div style="color:#555; font-size:10px; margin-top:2px;">
+                            до {{ driver.pin_expires_at[:10] }}
+                        </div>
+                        {% endif %}
+                    {% else %}
+                        <span style="color:#444;">—</span>
+                    {% endif %}
                 </td>
-                <td style="color:#888;font-size:12px;">
+
+                <!-- Баланс -->
+                <td>
+                    {% set bal = driver.balance or 0 %}
+                    <span class="balance {% if bal == 0 %}zero{% endif %}">
+                        {{ '{:,.0f}'.format(bal) }} сум
+                    </span>
+                </td>
+
+                <!-- Онлайн статус -->
+                <td>
+                    {% set os = driver.online_status or 'offline' %}
+                    {% if os == 'online' %}
+                        <span class="online-badge online-online">
+                            <span class="dot"></span> Онлайн
+                        </span>
+                    {% elif os == 'free' %}
+                        <span class="online-badge online-free">
+                            <span class="dot"></span> Свободен
+                        </span>
+                    {% elif os == 'busy' %}
+                        <span class="online-badge online-busy">
+                            <span class="dot"></span> На заказе
+                        </span>
+                    {% else %}
+                        <span class="online-badge online-offline">
+                            <span class="dot"></span> Офлайн
+                        </span>
+                    {% endif %}
+                </td>
+
+                <!-- Последний вход -->
+                <td style="color:#555; font-size:12px;">
+                    {% if driver.last_seen %}
+                        {{ driver.last_seen[:16] }}
+                    {% else %}
+                        <span style="color:#333;">Не входил</span>
+                    {% endif %}
+                </td>
+
+                <!-- Дата регистрации -->
+                <td style="color:#555; font-size:12px;">
                     {{ driver.created_at[:10] }}
                 </td>
+
+                <!-- Действия -->
                 <td>
-                    <a href="/reset_pin/{{ driver.tg_id }}" class="btn btn-reset">🔄 PIN</a>
+                    <a href="/reset_pin/{{ driver.tg_id }}"
+                       class="btn btn-reset"
+                       onclick="return confirm('Сбросить PIN?')">
+                       🔄 PIN
+                    </a>
                     {% if driver.is_blocked %}
-                        <a href="/unblock/{{ driver.tg_id }}" class="btn btn-unblock">✅ Разблок</a>
+                        <a href="/unblock/{{ driver.tg_id }}"
+                           class="btn btn-unblock"
+                           onclick="return confirm('Разблокировать?')">
+                           ✅ Разблок
+                        </a>
                     {% else %}
-                        <a href="/block/{{ driver.tg_id }}" class="btn btn-block">🚫 Блок</a>
+                        <a href="/block/{{ driver.tg_id }}"
+                           class="btn btn-block"
+                           onclick="return confirm('Заблокировать?')">
+                           🚫 Блок
+                        </a>
                     {% endif %}
                 </td>
             </tr>
             {% endfor %}
         </table>
+        {% else %}
+        <div class="empty">
+            <div class="icon">👥</div>
+            <p>
+                {% if search %}
+                    По запросу "{{ search }}" ничего не найдено
+                {% else %}
+                    Водителей пока нет
+                {% endif %}
+            </p>
+        </div>
+        {% endif %}
     </div>
+
+</div>
+
 </body>
 </html>
