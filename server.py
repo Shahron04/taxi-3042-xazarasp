@@ -104,7 +104,6 @@ def init_db():
 
 # ==================== ГЕНЕРАЦИЯ PIN ====================
 def generate_pin():
-    """Генерирует уникальный PIN для каждого водителя"""
     conn = get_db()
     c = conn.cursor()
     while True:
@@ -184,7 +183,6 @@ def get_pending_drivers():
     conn.close()
     return drivers
 
-# ✅ Одобрить по car_number — каждый получает свой уникальный PIN
 def approve_driver_by_car(car_number):
     pin = generate_pin()
     now = datetime.now()
@@ -387,7 +385,6 @@ def requests_page():
     pending = get_pending_drivers()
     return render_template('requests.html', drivers=pending)
 
-# ✅ ИСПРАВЛЕНО: одобряем только конкретного водителя по car_number
 @flask_app.route('/approve/<car_number>')
 @admin_required
 def web_approve(car_number):
@@ -490,7 +487,6 @@ def api_login():
             return jsonify({"success": False,
                             "error": "Заполните все поля"}), 400
 
-        # ✅ Ищем по car_number И pin одновременно
         conn = get_db()
         c = conn.cursor()
         c.execute(
@@ -557,51 +553,6 @@ def api_check_driver(car_number):
     except Exception as e:
         logging.error(f"Check error: {e}")
         return jsonify({"success": False, "is_blocked": True}), 500
-
-        # ✅ Ищем по car_number И pin одновременно
-        conn = get_db()
-        c = conn.cursor()
-        c.execute(
-            "SELECT * FROM drivers WHERE car_number = ? AND pin = ?",
-            (car_number, pin)
-        )
-        driver = c.fetchone()
-        conn.close()
-
-        if not driver:
-            return jsonify({"success": False,
-                            "error": "Неверный номер авто или PIN"}), 401
-        if driver['is_blocked']:
-            return jsonify({"success": False,
-                            "error": "Аккаунт заблокирован"}), 403
-        if driver['status'] != 'approved':
-            return jsonify({"success": False,
-                            "error": "Заявка ещё не одобрена"}), 403
-
-        if driver['pin_expires_at']:
-            expires = datetime.strptime(driver['pin_expires_at'],
-                                        "%Y-%m-%d %H:%M:%S")
-            if datetime.now() > expires:
-                return jsonify({"success": False,
-                                "error": "PIN истёк, обратитесь к администратору"}), 403
-
-        update_online_status(car_number, 'online')
-
-        return jsonify({
-            "success": True,
-            "driver": {
-                "id":            driver['id'],
-                "name":          driver['full_name'],
-                "car":           driver['car_number'],
-                "balance":       driver['balance'] if driver['balance'] else 0.0,
-                "online_status": "online",
-                "last_seen":     datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            }
-        }), 200
-
-    except Exception as e:
-        logging.error(f"Login error: {e}")
-        return jsonify({"success": False, "error": "Ошибка сервера"}), 500
 
 
 @flask_app.route('/api/driver/status', methods=['POST'])
@@ -681,8 +632,8 @@ def api_get_driver_trips(car_number):
         conn = get_db()
         c = conn.cursor()
         c.execute("""
-            SELECT * FROM trips 
-            WHERE car_number = ? 
+            SELECT * FROM trips
+            WHERE car_number = ?
             ORDER BY created_at DESC
             LIMIT 100
         """, (car_number.upper(),))
