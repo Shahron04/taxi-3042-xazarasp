@@ -6,37 +6,23 @@ import secrets
 from datetime import datetime, timedelta
 from functools import wraps
 
-from aiogram import Bot, Dispatcher, types
-from aiogram.filters import Command
-from aiogram.fsm.context import FSMContext
-from aiogram.fsm.state import State, StatesGroup
-from aiogram.fsm.storage.memory import MemoryStorage
-from aiogram.types import (ReplyKeyboardMarkup, KeyboardButton,
-                            InlineKeyboardMarkup, InlineKeyboardButton)
-
 from flask import (Flask, render_template, request,
                    redirect, url_for, session, jsonify)
 import os
 
 # ==================== НАСТРОЙКИ ====================
-ADMIN_IDS      = [int(x.strip()) for x in os.environ.get("ADMIN_IDS", "123456789").split(",") if x.strip()]
-ADMIN_USERNAME = os.environ.get("ADMIN_USERNAME", "admin").strip()
-ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "admin123").strip()
-SECRET_KEY     = os.environ.get("SECRET_KEY", "taxi2024secret").strip()
+ADMIN_USERNAME  = os.environ.get("ADMIN_USERNAME", "admin").strip()
+ADMIN_PASSWORD  = os.environ.get("ADMIN_PASSWORD", "admin123").strip()
+SECRET_KEY      = os.environ.get("SECRET_KEY", "taxi2024secret").strip()
 PIN_EXPIRE_DAYS = 30
-PORT           = int(os.environ.get("PORT", 5000))
+PORT            = int(os.environ.get("PORT", 5000))
 
 # ==================== ТАРИФЫ ====================
 class TaxiConfig:
     BASE_FARE   = 5000.0
     CITY_RATE   = 2800.0
     SUBURB_RATE = 3000.0
-    WAIT_RATE   = 500.0  # ✅ сум в минуту
-
-    @staticmethod
-    def calculatePrice(distKm: float, waitMin: int, isSuburb: bool) -> float:
-        rate = TaxiConfig.SUBURB_RATE if isSuburb else TaxiConfig.CITY_RATE
-        return TaxiConfig.BASE_FARE + (distKm * rate) + (waitMin * TaxiConfig.WAIT_RATE)
+    WAIT_RATE   = 500.0
 
 # ==================== БАЗА ДАННЫХ ====================
 def get_db():
@@ -118,7 +104,7 @@ def init_db():
 
 # ==================== ГЕНЕРАЦИЯ PIN ====================
 def generate_pin():
-    """✅ Генерирует уникальный PIN для каждого водителя"""
+    """Генерирует уникальный PIN для каждого водителя"""
     conn = get_db()
     c = conn.cursor()
     while True:
@@ -174,14 +160,6 @@ def reset_driver(car_number):
     conn.commit()
     conn.close()
 
-def get_driver(tg_id):
-    conn = get_db()
-    c = conn.cursor()
-    c.execute("SELECT * FROM drivers WHERE tg_id = ?", (tg_id,))
-    driver = c.fetchone()
-    conn.close()
-    return driver
-
 def get_driver_by_car(car_number):
     conn = get_db()
     c = conn.cursor()
@@ -206,6 +184,7 @@ def get_pending_drivers():
     conn.close()
     return drivers
 
+# ✅ Одобрить по car_number — каждый получает свой уникальный PIN
 def approve_driver_by_car(car_number):
     pin = generate_pin()
     now = datetime.now()
@@ -226,32 +205,6 @@ def approve_driver_by_car(car_number):
     conn.close()
     return pin
 
-def approve_driver(tg_id):
-    pin = generate_pin()
-    now = datetime.now()
-    expires = now + timedelta(days=PIN_EXPIRE_DAYS)
-    conn = get_db()
-    c = conn.cursor()
-    c.execute("""
-        UPDATE drivers
-        SET status = 'approved',
-            pin = ?,
-            pin_created_at = ?,
-            pin_expires_at = ?
-        WHERE tg_id = ?
-    """, (pin, now.strftime("%Y-%m-%d %H:%M:%S"),
-          expires.strftime("%Y-%m-%d %H:%M:%S"), tg_id))
-    conn.commit()
-    conn.close()
-    return pin
-
-def reject_driver(tg_id):
-    conn = get_db()
-    c = conn.cursor()
-    c.execute("UPDATE drivers SET status = 'rejected' WHERE tg_id = ?", (tg_id,))
-    conn.commit()
-    conn.close()
-
 def reject_driver_by_car(car_number):
     conn = get_db()
     c = conn.cursor()
@@ -260,7 +213,6 @@ def reject_driver_by_car(car_number):
     conn.commit()
     conn.close()
 
-# ✅ ИСПРАВЛЕНО: block/unblock по car_number
 def block_driver_by_car(car_number):
     conn = get_db()
     c = conn.cursor()
@@ -280,25 +232,6 @@ def unblock_driver_by_car(car_number):
     conn.commit()
     conn.close()
 
-def block_driver(tg_id):
-    conn = get_db()
-    c = conn.cursor()
-    c.execute("""
-        UPDATE drivers
-        SET is_blocked = 1, online_status = 'offline'
-        WHERE tg_id = ?
-    """, (tg_id,))
-    conn.commit()
-    conn.close()
-
-def unblock_driver(tg_id):
-    conn = get_db()
-    c = conn.cursor()
-    c.execute("UPDATE drivers SET is_blocked = 0 WHERE tg_id = ?", (tg_id,))
-    conn.commit()
-    conn.close()
-
-# ✅ ИСПРАВЛЕНО: reset_pin по car_number
 def reset_pin_by_car(car_number):
     pin = generate_pin()
     now = datetime.now()
@@ -316,33 +249,6 @@ def reset_pin_by_car(car_number):
     conn.close()
     return pin
 
-def reset_pin(tg_id):
-    pin = generate_pin()
-    now = datetime.now()
-    expires = now + timedelta(days=PIN_EXPIRE_DAYS)
-    conn = get_db()
-    c = conn.cursor()
-    c.execute("""
-        UPDATE drivers
-        SET pin = ?, pin_created_at = ?, pin_expires_at = ?
-        WHERE tg_id = ?
-    """, (pin, now.strftime("%Y-%m-%d %H:%M:%S"),
-          expires.strftime("%Y-%m-%d %H:%M:%S"), tg_id))
-    conn.commit()
-    conn.close()
-    return pin
-
-def update_balance_db(car_number, amount):
-    conn = get_db()
-    c = conn.cursor()
-    c.execute("""
-        UPDATE drivers
-        SET balance = balance + ?
-        WHERE car_number = ?
-    """, (amount, car_number.upper()))
-    conn.commit()
-    conn.close()
-
 def update_online_status(car_number, status):
     conn = get_db()
     c = conn.cursor()
@@ -358,7 +264,8 @@ def update_online_status(car_number, status):
 def get_balance(car_number):
     conn = get_db()
     c = conn.cursor()
-    c.execute("SELECT balance FROM drivers WHERE car_number = ?", (car_number.upper(),))
+    c.execute("SELECT balance FROM drivers WHERE car_number = ?",
+              (car_number.upper(),))
     row = c.fetchone()
     conn.close()
     return row['balance'] if row else 0.0
@@ -417,7 +324,8 @@ def get_stats():
     stats['today'] = c.fetchone()[0]
     c.execute("SELECT COUNT(*) FROM trips WHERE created_at LIKE ?", (f"{today}%",))
     stats['trips_today'] = c.fetchone()[0]
-    c.execute("SELECT COALESCE(SUM(price), 0) FROM trips WHERE created_at LIKE ?", (f"{today}%",))
+    c.execute("SELECT COALESCE(SUM(price), 0) FROM trips WHERE created_at LIKE ?",
+              (f"{today}%",))
     stats['earnings_today'] = c.fetchone()[0]
     c.execute("SELECT COUNT(*) FROM trips")
     stats['trips_total'] = c.fetchone()[0]
@@ -433,382 +341,6 @@ def get_logs():
     logs = c.fetchall()
     conn.close()
     return logs
-
-def save_broadcast(message, sent_count):
-    conn = get_db()
-    c = conn.cursor()
-    c.execute("INSERT INTO broadcasts (message, sent_count) VALUES (?, ?)",
-              (message, sent_count))
-    conn.commit()
-    conn.close()
-
-# ==================== БОТ ====================
-bot     = Bot(token=BOT_TOKEN)
-storage = MemoryStorage()
-dp      = Dispatcher(storage=storage)
-
-class DriverReg(StatesGroup):
-    full_name  = State()
-    phone      = State()
-    car_number = State()
-
-class BroadcastState(StatesGroup):
-    message = State()
-
-def main_keyboard():
-    return ReplyKeyboardMarkup(
-        keyboard=[
-            [KeyboardButton(text="📝 Регистрация")],
-            [KeyboardButton(text="🔑 Мой PIN")],
-            [KeyboardButton(text="📊 Мой статус")],
-        ],
-        resize_keyboard=True
-    )
-
-def phone_keyboard():
-    return ReplyKeyboardMarkup(
-        keyboard=[[KeyboardButton(text="📱 Отправить номер", request_contact=True)]],
-        resize_keyboard=True
-    )
-
-def admin_keyboard():
-    return ReplyKeyboardMarkup(
-        keyboard=[
-            [KeyboardButton(text="📝 Заявки")],
-            [KeyboardButton(text="👥 Все водители")],
-            [KeyboardButton(text="📊 Статистика")],
-            [KeyboardButton(text="📢 Рассылка")]
-        ],
-        resize_keyboard=True
-    )
-
-# ==================== КОМАНДЫ БОТА ====================
-
-@dp.message(Command("start"))
-async def start(message: types.Message):
-    if message.from_user.id in ADMIN_IDS:
-        await message.answer("👋 Добро пожаловать, Администратор!",
-                             reply_markup=admin_keyboard())
-    else:
-        await message.answer(
-            "👋 Добро пожаловать!\n\n"
-            "Для работы необходимо:\n"
-            "1️⃣ Зарегистрироваться\n"
-            "2️⃣ Дождаться одобрения\n"
-            "3️⃣ Получить PIN-код",
-            reply_markup=main_keyboard()
-        )
-
-# ==================== CALLBACK ====================
-
-@dp.callback_query(lambda c: c.data and c.data.startswith("approve_"))
-async def callback_approve(callback: types.CallbackQuery):
-    if callback.from_user.id not in ADMIN_IDS:
-        await callback.answer("❌ Нет доступа!")
-        return
-    car_number = callback.data.replace("approve_", "", 1)
-    pin = approve_driver_by_car(car_number)
-    add_log("approve", callback.from_user.id, 0, f"Авто: {car_number} PIN: {pin}")
-    await callback.message.edit_text(
-        f"✅ Водитель одобрен!\n\n"
-        f"🚗 Авто: {car_number}\n"
-        f"🔑 PIN: <b>{pin}</b>\n\n"
-        f"Водитель может войти в приложение",
-        parse_mode="HTML"
-    )
-    await callback.answer("✅ Одобрено!")
-
-@dp.callback_query(lambda c: c.data and c.data.startswith("reject_"))
-async def callback_reject(callback: types.CallbackQuery):
-    if callback.from_user.id not in ADMIN_IDS:
-        await callback.answer("❌ Нет доступа!")
-        return
-    car_number = callback.data.replace("reject_", "", 1)
-    reject_driver_by_car(car_number)
-    add_log("reject", callback.from_user.id, 0, f"Авто: {car_number}")
-    await callback.message.edit_text(
-        f"❌ Водитель отклонён!\n\n🚗 Авто: {car_number}"
-    )
-    await callback.answer("❌ Отклонено!")
-
-# ==================== РЕГИСТРАЦИЯ ====================
-
-@dp.message(lambda m: m.text == "📝 Регистрация")
-async def registration(message: types.Message, state: FSMContext):
-    if message.from_user.id in ADMIN_IDS:
-        return
-    driver = get_driver(message.from_user.id)
-    if driver:
-        if driver['is_blocked']:
-            await message.answer("🚫 Аккаунт заблокирован!")
-            return
-        if driver['status'] == 'pending':
-            await message.answer("⏳ Заявка на рассмотрении!")
-            return
-        elif driver['status'] == 'approved':
-            await message.answer("✅ Вы уже зарегистрированы!")
-            return
-        elif driver['status'] == 'rejected':
-            await message.answer("❌ Заявка отклонена!")
-            return
-    await message.answer("📝 Введите полное имя:")
-    await state.set_state(DriverReg.full_name)
-
-@dp.message(DriverReg.full_name)
-async def get_full_name(message: types.Message, state: FSMContext):
-    await state.update_data(full_name=message.text)
-    await message.answer("📱 Отправьте номер телефона:", reply_markup=phone_keyboard())
-    await state.set_state(DriverReg.phone)
-
-@dp.message(DriverReg.phone)
-async def get_phone(message: types.Message, state: FSMContext):
-    phone = message.contact.phone_number if message.contact else message.text
-    await state.update_data(phone=phone)
-    await message.answer("🚗 Введите номер автомобиля:",
-                         reply_markup=types.ReplyKeyboardRemove())
-    await state.set_state(DriverReg.car_number)
-
-@dp.message(DriverReg.car_number)
-async def get_car_number(message: types.Message, state: FSMContext):
-    data = await state.get_data()
-    add_driver(
-        tg_id=message.from_user.id,
-        username=message.from_user.username or "нет",
-        full_name=data['full_name'],
-        phone=data['phone'],
-        car_number=message.text
-    )
-    await state.clear()
-    await message.answer("✅ Заявка отправлена!\n⏳ Ожидайте одобрения",
-                         reply_markup=main_keyboard())
-
-    keyboard = InlineKeyboardMarkup(inline_keyboard=[[
-        InlineKeyboardButton(
-            text="✅ Одобрить",
-            callback_data=f"approve_{message.text.upper()}"
-        ),
-        InlineKeyboardButton(
-            text="❌ Отклонить",
-            callback_data=f"reject_{message.text.upper()}"
-        )
-    ]])
-    for admin_id in ADMIN_IDS:
-        try:
-            await bot.send_message(
-                admin_id,
-                f"🆕 Новая заявка!\n\n"
-                f"👤 {data['full_name']}\n"
-                f"📱 {data['phone']}\n"
-                f"🚗 {message.text}\n"
-                f"🔗 @{message.from_user.username}",
-                reply_markup=keyboard
-            )
-        except:
-            pass
-
-@dp.message(lambda m: m.text == "🔑 Мой PIN")
-async def my_pin(message: types.Message):
-    driver = get_driver(message.from_user.id)
-    if not driver:
-        await message.answer("❌ Вы не зарегистрированы!")
-        return
-    if driver['is_blocked']:
-        await message.answer("🚫 Аккаунт заблокирован!")
-        return
-    if driver['status'] == 'approved':
-        await message.answer(
-            f"🔑 PIN-код: <b>{driver['pin']}</b>\n"
-            f"⏰ До: {driver['pin_expires_at']}",
-            parse_mode="HTML"
-        )
-    elif driver['status'] == 'pending':
-        await message.answer("⏳ Заявка на рассмотрении")
-    else:
-        await message.answer("❌ Заявка отклонена")
-
-@dp.message(lambda m: m.text == "📊 Мой статус")
-async def my_status(message: types.Message):
-    driver = get_driver(message.from_user.id)
-    if not driver:
-        await message.answer("❌ Вы не зарегистрированы!")
-        return
-    status_text = {
-        'pending':  '⏳ На рассмотрении',
-        'approved': '✅ Одобрен',
-        'rejected': '❌ Отклонен'
-    }
-    blocked = "🚫" if driver['is_blocked'] else ""
-    online  = "🟢" if driver['online_status'] in ('online', 'free', 'busy') else "⚫"
-    await message.answer(
-        f"📊 Статус: {status_text[driver['status']]} {blocked}\n\n"
-        f"👤 {driver['full_name']}\n"
-        f"📱 {driver['phone']}\n"
-        f"🚗 {driver['car_number']}\n"
-        f"💰 Баланс: {driver['balance'] or 0:.0f} сум\n"
-        f"📍 {online} Онлайн статус\n"
-        f"📅 {driver['created_at']}"
-    )
-
-# ==================== АДМИН ====================
-
-@dp.message(lambda m: m.text == "📝 Заявки")
-async def pending_list(message: types.Message):
-    if message.from_user.id not in ADMIN_IDS:
-        return
-    drivers = get_pending_drivers()
-    if not drivers:
-        await message.answer("📭 Нет новых заявок")
-        return
-    for driver in drivers:
-        keyboard = InlineKeyboardMarkup(inline_keyboard=[[
-            InlineKeyboardButton(
-                text="✅ Одобрить",
-                callback_data=f"approve_{driver['car_number']}"
-            ),
-            InlineKeyboardButton(
-                text="❌ Отклонить",
-                callback_data=f"reject_{driver['car_number']}"
-            )
-        ]])
-        await message.answer(
-            f"🆕 Заявка\n\n"
-            f"👤 {driver['full_name']}\n"
-            f"📱 {driver['phone']}\n"
-            f"🚗 {driver['car_number']}\n"
-            f"🔗 @{driver['username']}",
-            reply_markup=keyboard
-        )
-
-@dp.message(lambda m: m.text == "👥 Все водители")
-async def all_drivers(message: types.Message):
-    if message.from_user.id not in ADMIN_IDS:
-        return
-    drivers = get_all_drivers()
-    if not drivers:
-        await message.answer("📭 Нет водителей")
-        return
-    text = "👥 Водители:\n\n"
-    for driver in drivers:
-        status  = {'pending': '⏳', 'approved': '✅', 'rejected': '❌'}.get(driver['status'], '❓')
-        blocked = "🚫" if driver['is_blocked'] else ""
-        online  = "🟢" if driver['online_status'] in ('online', 'free', 'busy') else "⚫"
-        text += (f"{status}{blocked}{online} {driver['full_name']} "
-                 f"| {driver['car_number']}\n"
-                 f"    💰 {driver['balance'] or 0:.0f} сум\n"
-                 f"    /info_{driver['tg_id']}\n\n")
-    await message.answer(text)
-
-@dp.message(lambda m: m.text == "📊 Статистика")
-async def statistics(message: types.Message):
-    if message.from_user.id not in ADMIN_IDS:
-        return
-    stats = get_stats()
-    await message.answer(
-        f"📊 Статистика:\n\n"
-        f"👥 Всего водителей: {stats['total']}\n"
-        f"✅ Одобрено: {stats['approved']}\n"
-        f"⏳ Ожидают: {stats['pending']}\n"
-        f"❌ Отклонено: {stats['rejected']}\n"
-        f"🚫 Заблокировано: {stats['blocked']}\n"
-        f"🟢 Онлайн: {stats['online']}\n"
-        f"📅 Новых сегодня: {stats['today']}\n\n"
-        f"🚕 Поездок сегодня: {stats['trips_today']}\n"
-        f"💰 Заработок сегодня: {stats['earnings_today']:,.0f} сум\n"
-        f"🚕 Поездок всего: {stats['trips_total']}\n"
-        f"💰 Заработок всего: {stats['earnings_total']:,.0f} сум"
-    )
-
-@dp.message(lambda m: m.text == "📢 Рассылка")
-async def broadcast_start(message: types.Message, state: FSMContext):
-    if message.from_user.id not in ADMIN_IDS:
-        return
-    await message.answer("📢 Введите сообщение:")
-    await state.set_state(BroadcastState.message)
-
-@dp.message(BroadcastState.message)
-async def broadcast_send(message: types.Message, state: FSMContext):
-    await state.clear()
-    drivers = get_all_drivers()
-    sent = 0
-    failed = 0
-    for driver in drivers:
-        if driver['status'] == 'approved' and not driver['is_blocked']:
-            try:
-                await bot.send_message(driver['tg_id'],
-                                       f"📢 Сообщение:\n\n{message.text}")
-                sent += 1
-            except:
-                failed += 1
-    save_broadcast(message.text, sent)
-    await message.answer(f"✅ Отправлено: {sent}\n❌ Ошибок: {failed}")
-
-@dp.message(lambda m: m.text and m.text.startswith("/info_"))
-async def driver_info(message: types.Message):
-    if message.from_user.id not in ADMIN_IDS:
-        return
-    tg_id  = int(message.text.split("_")[1])
-    driver = get_driver(tg_id)
-    if not driver:
-        await message.answer("❌ Не найден")
-        return
-    status_text = {'pending': '⏳', 'approved': '✅', 'rejected': '❌'}
-    online      = "🟢 Онлайн" if driver['online_status'] in ('online', 'free', 'busy') else "⚫ Офлайн"
-    trips       = get_driver_trips(driver['car_number'])
-    trips_count    = len(trips)
-    trips_earnings = sum(t['price'] for t in trips)
-
-    await message.answer(
-        f"👤 {driver['full_name']}\n"
-        f"📱 {driver['phone']}\n"
-        f"🚗 {driver['car_number']}\n"
-        f"Статус: {status_text[driver['status']]}\n"
-        f"PIN: {driver['pin'] or 'нет'}\n"
-        f"До: {driver['pin_expires_at'] or 'нет'}\n"
-        f"💰 Баланс: {driver['balance'] or 0:.0f} сум\n"
-        f"📍 {online}\n"
-        f"🕐 Последний вход: {driver['last_seen'] or 'никогда'}\n"
-        f"🚕 Поездок: {trips_count}\n"
-        f"💵 Заработано: {trips_earnings:,.0f} сум\n"
-        f"Блок: {'Да 🚫' if driver['is_blocked'] else 'Нет'}\n\n"
-        f"🔄 /resetpin_{driver['car_number']}\n"
-        f"🚫 /block_{tg_id}\n"
-        f"✅ /unblock_{tg_id}"
-    )
-
-@dp.message(lambda m: m.text and m.text.startswith("/block_"))
-async def block(message: types.Message):
-    if message.from_user.id not in ADMIN_IDS:
-        return
-    tg_id = int(message.text.split("_")[1])
-    block_driver(tg_id)
-    add_log("block", message.from_user.id, tg_id, "Заблокирован")
-    await message.answer("🚫 Заблокирован!")
-    try:
-        await bot.send_message(tg_id, "🚫 Аккаунт заблокирован!")
-    except:
-        pass
-
-@dp.message(lambda m: m.text and m.text.startswith("/unblock_"))
-async def unblock(message: types.Message):
-    if message.from_user.id not in ADMIN_IDS:
-        return
-    tg_id = int(message.text.split("_")[1])
-    unblock_driver(tg_id)
-    add_log("unblock", message.from_user.id, tg_id, "Разблокирован")
-    await message.answer("✅ Разблокирован!")
-    try:
-        await bot.send_message(tg_id, "✅ Аккаунт разблокирован!")
-    except:
-        pass
-
-@dp.message(lambda m: m.text and m.text.startswith("/resetpin_"))
-async def reset_pin_cmd(message: types.Message):
-    if message.from_user.id not in ADMIN_IDS:
-        return
-    car_number = message.text.split("_")[1]
-    pin = reset_pin_by_car(car_number)
-    add_log("reset_pin", message.from_user.id, 0, f"Авто: {car_number} PIN: {pin}")
-    await message.answer(f"🔄 Новый PIN: {pin}")
 
 # ==================== FLASK ====================
 flask_app = Flask(__name__, template_folder='.')
@@ -852,23 +384,24 @@ def drivers():
 @flask_app.route('/requests')
 @admin_required
 def requests_page():
-    return render_template('requests.html', drivers=get_pending_drivers())
+    pending = get_pending_drivers()
+    return render_template('requests.html', drivers=pending)
 
-@flask_app.route('/approve/<int:tg_id>')
+# ✅ ИСПРАВЛЕНО: одобряем только конкретного водителя по car_number
+@flask_app.route('/approve/<car_number>')
 @admin_required
-def web_approve(tg_id):
-    pin = approve_driver(tg_id)
-    add_log("approve", 0, tg_id, f"PIN: {pin}")
+def web_approve(car_number):
+    pin = approve_driver_by_car(car_number)
+    add_log("approve", 0, 0, f"Авто: {car_number} PIN: {pin}")
     return redirect(url_for('requests_page'))
 
-@flask_app.route('/reject/<int:tg_id>')
+@flask_app.route('/reject/<car_number>')
 @admin_required
-def web_reject(tg_id):
-    reject_driver(tg_id)
-    add_log("reject", 0, tg_id, "Отклонен")
+def web_reject(car_number):
+    reject_driver_by_car(car_number)
+    add_log("reject", 0, 0, f"Авто: {car_number}")
     return redirect(url_for('requests_page'))
 
-# ✅ ИСПРАВЛЕНО: используем car_number
 @flask_app.route('/block/<car_number>')
 @admin_required
 def web_block(car_number):
@@ -903,27 +436,9 @@ def trips_page():
 @flask_app.route('/broadcast', methods=['GET', 'POST'])
 @admin_required
 def broadcast():
-    if request.method == 'POST':
-        msg    = request.form.get('message')
-        sent   = 0
-        failed = 0
-        async def send_all():
-            nonlocal sent, failed
-            for driver in get_all_drivers():
-                if driver['status'] == 'approved' and not driver['is_blocked']:
-                    try:
-                        await bot.send_message(driver['tg_id'],
-                                               f"📢 Сообщение:\n\n{msg}")
-                        sent += 1
-                    except:
-                        failed += 1
-        asyncio.run(send_all())
-        save_broadcast(msg, sent)
-        return render_template('broadcast.html', success=True,
-                               sent=sent, failed=failed)
     return render_template('broadcast.html')
 
-# ==================== API ====================
+# ==================== API для APK ====================
 
 @flask_app.route('/api/driver/register', methods=['POST'])
 def api_register():
@@ -934,13 +449,15 @@ def api_register():
         phone      = data.get('phone', '').strip()
 
         if not name or not car_number:
-            return jsonify({"success": False, "error": "Заполните все поля"}), 400
+            return jsonify({"success": False,
+                            "error": "Заполните все поля"}), 400
 
         driver = get_driver_by_car(car_number)
 
         if driver:
             if driver['is_blocked']:
-                return jsonify({"success": False, "error": "Аккаунт заблокирован"}), 403
+                return jsonify({"success": False,
+                                "error": "Аккаунт заблокирован"}), 403
             if driver['status'] == 'pending':
                 return jsonify({"success": False,
                                 "error": "Заявка уже отправлена, ожидайте"}), 200
@@ -954,33 +471,8 @@ def api_register():
         add_driver(tg_id=0, username=name, full_name=name,
                    phone=phone, car_number=car_number)
 
-        async def notify():
-            keyboard = InlineKeyboardMarkup(inline_keyboard=[[
-                InlineKeyboardButton(
-                    text="✅ Одобрить",
-                    callback_data=f"approve_{car_number}"
-                ),
-                InlineKeyboardButton(
-                    text="❌ Отклонить",
-                    callback_data=f"reject_{car_number}"
-                )
-            ]])
-            for admin_id in ADMIN_IDS:
-                try:
-                    await bot.send_message(
-                        admin_id,
-                        f"🆕 Новая заявка из APK!\n\n"
-                        f"👤 Имя: {name}\n"
-                        f"🚗 Авто: {car_number}\n"
-                        f"📱 Телефон: {phone}",
-                        reply_markup=keyboard
-                    )
-                except Exception as e:
-                    logging.error(f"Notify error: {e}")
-
-        asyncio.run(notify())
         return jsonify({"success": True,
-                        "message": "Заявка отправлена! Ожидайте PIN"}), 200
+                        "message": "Заявка отправлена! Ожидайте одобрения"}), 200
 
     except Exception as e:
         logging.error(f"Register error: {e}")
@@ -995,7 +487,8 @@ def api_login():
         pin        = data.get('pin', '').strip()
 
         if not car_number or not pin:
-            return jsonify({"success": False, "error": "Заполните все поля"}), 400
+            return jsonify({"success": False,
+                            "error": "Заполните все поля"}), 400
 
         # ✅ Ищем по car_number И pin одновременно
         conn = get_db()
@@ -1051,7 +544,8 @@ def api_update_status():
         status     = data.get('status', 'online').strip()
 
         if status not in ['online', 'offline', 'busy', 'free']:
-            return jsonify({"success": False, "error": "Неверный статус"}), 400
+            return jsonify({"success": False,
+                            "error": "Неверный статус"}), 400
 
         update_online_status(car_number, status)
         return jsonify({"success": True}), 200
@@ -1127,41 +621,8 @@ def api_get_tariffs():
         return jsonify({"success": False}), 500
 
 
-@flask_app.route('/api/tariffs/update', methods=['POST'])
-@admin_required
-def api_update_tariffs():
-    try:
-        data = request.get_json()
-        TaxiConfig.BASE_FARE   = float(data.get('base_fare',   TaxiConfig.BASE_FARE))
-        TaxiConfig.CITY_RATE   = float(data.get('city_rate',   TaxiConfig.CITY_RATE))
-        TaxiConfig.SUBURB_RATE = float(data.get('suburb_rate', TaxiConfig.SUBURB_RATE))
-        TaxiConfig.WAIT_RATE   = float(data.get('wait_rate',   TaxiConfig.WAIT_RATE))
-        add_log("tariff_update", 0, 0,
-            f"Посадка:{TaxiConfig.BASE_FARE} "
-            f"Город:{TaxiConfig.CITY_RATE} "
-            f"Загород:{TaxiConfig.SUBURB_RATE} "
-            f"Ожидание:{TaxiConfig.WAIT_RATE}"
-        )
-        return jsonify({"success": True}), 200
-    except Exception as e:
-        return jsonify({"success": False}), 500
-
-
 # ==================== ЗАПУСК ====================
-
-def run_bot():
-    async def start_bot():
-        logging.basicConfig(level=logging.INFO)
-        await dp.start_polling(bot)
-    asyncio.run(start_bot())
-
-
 init_db()
-
-bot_thread        = threading.Thread(target=run_bot)
-bot_thread.daemon = True
-bot_thread.start()
-
 app = flask_app
 
 if __name__ == "__main__":
