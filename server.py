@@ -437,7 +437,7 @@ def trips_page():
 @admin_required
 def broadcast():
     return render_template('broadcast.html')
-
+  
 # ==================== API для APK ====================
 
 @flask_app.route('/api/driver/register', methods=['POST'])
@@ -490,7 +490,53 @@ def api_login():
             return jsonify({"success": False,
                             "error": "Заполните все поля"}), 400
 
-      # ✅ Новый endpoint — проверка статуса водителя
+        # ✅ Ищем по car_number И pin одновременно
+        conn = get_db()
+        c = conn.cursor()
+        c.execute(
+            "SELECT * FROM drivers WHERE car_number = ? AND pin = ?",
+            (car_number, pin)
+        )
+        driver = c.fetchone()
+        conn.close()
+
+        if not driver:
+            return jsonify({"success": False,
+                            "error": "Неверный номер авто или PIN"}), 401
+        if driver['is_blocked']:
+            return jsonify({"success": False,
+                            "error": "Аккаунт заблокирован"}), 403
+        if driver['status'] != 'approved':
+            return jsonify({"success": False,
+                            "error": "Заявка ещё не одобрена"}), 403
+
+        if driver['pin_expires_at']:
+            expires = datetime.strptime(driver['pin_expires_at'],
+                                        "%Y-%m-%d %H:%M:%S")
+            if datetime.now() > expires:
+                return jsonify({"success": False,
+                                "error": "PIN истёк, обратитесь к администратору"}), 403
+
+        update_online_status(car_number, 'online')
+
+        return jsonify({
+            "success": True,
+            "driver": {
+                "id":            driver['id'],
+                "name":          driver['full_name'],
+                "car":           driver['car_number'],
+                "balance":       driver['balance'] if driver['balance'] else 0.0,
+                "online_status": "online",
+                "last_seen":     datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            }
+        }), 200
+
+    except Exception as e:
+        logging.error(f"Login error: {e}")
+        return jsonify({"success": False, "error": "Ошибка сервера"}), 500
+
+
+# ✅ Проверка статуса водителя (блокировка)
 @flask_app.route('/api/driver/check/<car_number>', methods=['GET'])
 def api_check_driver(car_number):
     try:
@@ -511,6 +557,18 @@ def api_check_driver(car_number):
     except Exception as e:
         logging.error(f"Check error: {e}")
         return jsonify({"success": False, "is_blocked": True}), 500
+
+
+@flask_app.route('/api/driver/login', methods=['POST'])
+def api_login():
+    try:
+        data       = request.get_json()
+        car_number = data.get('car_number', '').strip().upper()
+        pin        = data.get('pin', '').strip()
+
+        if not car_number or not pin:
+            return jsonify({"success": False,
+                            "error": "Заполните все поля"}), 400
 
         # ✅ Ищем по car_number И pin одновременно
         conn = get_db()
