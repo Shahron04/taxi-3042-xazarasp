@@ -6,7 +6,6 @@
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { background: #0f0f0f; font-family: Arial, sans-serif; color: #fff; }
-
         .header {
             background: #1a1a1a;
             padding: 16px 24px;
@@ -28,9 +27,7 @@
         }
         .nav a:hover { color: #FAD201; }
         .logout { color: #ff4444 !important; }
-
         .content { padding: 30px; max-width: 1600px; margin: 0 auto; }
-
         .page-title {
             font-size: 22px;
             font-weight: bold;
@@ -40,12 +37,6 @@
             align-items: center;
             gap: 10px;
         }
-        .page-title span {
-            font-size: 13px;
-            color: #555;
-            font-weight: normal;
-        }
-
         .search-form {
             display: flex;
             gap: 10px;
@@ -72,10 +63,7 @@
             font-weight: bold;
             cursor: pointer;
             font-size: 14px;
-            transition: opacity 0.2s;
         }
-        .search-form button:hover { opacity: 0.85; }
-
         .table-wrap {
             background: #1a1a1a;
             border-radius: 12px;
@@ -83,11 +71,7 @@
             border: 1px solid #2a2a2a;
             overflow-x: auto;
         }
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            min-width: 900px;
-        }
+        table { width: 100%; border-collapse: collapse; min-width: 1000px; }
         th {
             background: #222;
             padding: 14px 16px;
@@ -107,7 +91,6 @@
         }
         tr:last-child td { border-bottom: none; }
         tr:hover td { background: #222; }
-
         .badge {
             display: inline-block;
             padding: 4px 12px;
@@ -120,7 +103,6 @@
         .badge-pending  { background: #e65100; color: #ff9800; }
         .badge-rejected { background: #b71c1c; color: #f44336; }
         .badge-blocked  { background: #2a2a2a; color: #ff4444; }
-
         .online-badge {
             display: inline-flex;
             align-items: center;
@@ -129,13 +111,8 @@
             border-radius: 20px;
             font-size: 11px;
             font-weight: bold;
-            white-space: nowrap;
         }
-        .online-badge .dot {
-            width: 7px;
-            height: 7px;
-            border-radius: 50%;
-        }
+        .online-badge .dot { width: 7px; height: 7px; border-radius: 50%; }
         .online-online  { background: #0d2a1a; color: #22c97a; }
         .online-online .dot  { background: #22c97a; }
         .online-free    { background: #0d2a1a; color: #22c97a; }
@@ -144,17 +121,17 @@
         .online-busy .dot    { background: #f59e0b; }
         .online-offline { background: #1a1a1a; color: #555; }
         .online-offline .dot { background: #555; }
-
         .btn {
             display: inline-block;
-            padding: 6px 12px;
+            padding: 6px 10px;
             border-radius: 6px;
             border: none;
             cursor: pointer;
-            font-size: 12px;
+            font-size: 11px;
             font-weight: bold;
             text-decoration: none;
-            margin-right: 4px;
+            margin-right: 3px;
+            margin-bottom: 3px;
             transition: opacity 0.2s;
             white-space: nowrap;
         }
@@ -162,25 +139,15 @@
         .btn-block   { background: #b71c1c; color: #fff; }
         .btn-unblock { background: #1b5e20; color: #4CAF50; border: 1px solid #4CAF50; }
         .btn-reset   { background: #e65100; color: #fff; }
-
+        .btn-history { background: #1a3a5c; color: #60a5fa; border: 1px solid #60a5fa; }
         .balance { color: #22c97a; font-weight: bold; }
         .balance.zero { color: #444; }
-
         .pin-code {
             color: #FAD201;
             font-weight: bold;
             font-size: 16px;
             letter-spacing: 2px;
         }
-
-        .empty {
-            text-align: center;
-            padding: 80px;
-            color: #444;
-        }
-        .empty .icon { font-size: 48px; margin-bottom: 12px; }
-        .empty p { font-size: 14px; }
-
         .counter {
             display: inline-block;
             background: #2a2a2a;
@@ -190,6 +157,12 @@
             font-size: 12px;
             margin-left: 8px;
         }
+        .empty {
+            text-align: center;
+            padding: 80px;
+            color: #444;
+        }
+        .empty .icon { font-size: 48px; margin-bottom: 12px; }
     </style>
 </head>
 <body>
@@ -199,8 +172,8 @@
     <div class="nav">
         <a href="/">🏠 Главная</a>
         <a href="/requests">📝 Заявки</a>
+        <a href="/trips">🚕 Поездки</a>
         <a href="/stats">📊 Статистика</a>
-        <a href="/broadcast">📢 Рассылка</a>
         <a href="/logout" class="logout">🚪 Выйти</a>
     </div>
 </div>
@@ -342,13 +315,19 @@
                     {{ driver.created_at[:10] }}
                 </td>
 
-                <!-- ✅ ИСПРАВЛЕНО: используем car_number вместо tg_id -->
                 <td>
+                    <!-- ✅ История поездок -->
+                    <a href="/trips?car={{ driver.car_number }}"
+                       class="btn btn-history">
+                       🚕 История
+                    </a>
+                    <!-- ✅ Сброс PIN -->
                     <a href="/reset_pin/{{ driver.car_number }}"
                        class="btn btn-reset"
                        onclick="return confirm('Сбросить PIN для {{ driver.car_number }}?')">
                        🔄 PIN
                     </a>
+                    <!-- ✅ Блок/Разблок -->
                     {% if driver.is_blocked %}
                         <a href="/unblock/{{ driver.car_number }}"
                            class="btn btn-unblock"
@@ -381,6 +360,5 @@
     </div>
 
 </div>
-
 </body>
 </html>
