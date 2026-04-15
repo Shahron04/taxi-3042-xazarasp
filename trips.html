@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Поездки — TAXI 3042</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { background: #0f0f0f; font-family: Arial, sans-serif; color: #fff; }
+
+        .header {
+            background: #1a1a1a;
+            padding: 16px 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 2px solid #FAD201;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        .header h1 { color: #FAD201; font-size: 20px; }
+        .nav a {
+            color: #aaa;
+            text-decoration: none;
+            margin-left: 20px;
+            font-size: 14px;
+        }
+        .nav a:hover { color: #FAD201; }
+        .logout { color: #ff4444 !important; }
+
+        .content { padding: 30px; max-width: 1600px; margin: 0 auto; }
+
+        .page-title {
+            font-size: 22px;
+            font-weight: bold;
+            color: #fff;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .counter {
+            display: inline-block;
+            background: #2a2a2a;
+            color: #FAD201;
+            padding: 2px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+        }
+
+        /* СТАТИСТИКА */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 12px;
+            margin-bottom: 24px;
+        }
+        .stat-card {
+            background: #1a1a1a;
+            border: 1px solid #2a2a2a;
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+        }
+        .stat-value {
+            font-size: 22px;
+            font-weight: bold;
+            margin-bottom: 4px;
+        }
+        .stat-label {
+            font-size: 12px;
+            color: #555;
+        }
+
+        /* ФИЛЬТР */
+        .filter-form {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 24px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        .filter-form input {
+            padding: 10px 16px;
+            background: #1a1a1a;
+            border: 1px solid #333;
+            border-radius: 8px;
+            color: #fff;
+            font-size: 14px;
+            outline: none;
+        }
+        .filter-form input:focus { border-color: #FAD201; }
+        .filter-form button {
+            padding: 10px 20px;
+            background: #FAD201;
+            color: #000;
+            border: none;
+            border-radius: 8px;
+            font-weight: bold;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .btn-reset-filter {
+            padding: 10px 16px;
+            background: #2a2a2a;
+            color: #aaa;
+            border-radius: 8px;
+            text-decoration: none;
+            font-size: 14px;
+        }
+
+        /* ТАБЛИЦА */
+        .table-wrap {
+            background: #1a1a1a;
+            border-radius: 12px;
+            overflow: hidden;
+            border: 1px solid #2a2a2a;
+            overflow-x: auto;
+        }
+        table { width: 100%; border-collapse: collapse; min-width: 900px; }
+        th {
+            background: #222;
+            padding: 14px 16px;
+            text-align: left;
+            color: #FAD201;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            white-space: nowrap;
+        }
+        td {
+            padding: 14px 16px;
+            border-bottom: 1px solid #222;
+            font-size: 13px;
+            color: #ccc;
+            vertical-align: middle;
+        }
+        tr:last-child td { border-bottom: none; }
+        tr:hover td { background: #222; }
+
+        .price {
+            color: #22c97a;
+            font-weight: bold;
+            font-size: 15px;
+        }
+        .car-badge {
+            background: #2a2a2a;
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-weight: bold;
+            color: #FAD201;
+            letter-spacing: 1px;
+            font-size: 13px;
+            text-decoration: none;
+        }
+        .car-badge:hover { background: #3a3a3a; }
+        .dist-city   { color: #60a5fa; font-weight: bold; }
+        .dist-suburb { color: #f59e0b; font-weight: bold; }
+        .wait-time   { color: #a78bfa; }
+        .duration    { color: #34d399; }
+
+        .empty {
+            text-align: center;
+            padding: 80px;
+            color: #444;
+        }
+        .empty .icon { font-size: 48px; margin-bottom: 12px; }
+
+        /* Активный фильтр */
+        .active-filter {
+            background: #1a3a1a;
+            border: 1px solid #4CAF50;
+            border-radius: 8px;
+            padding: 8px 16px;
+            color: #4CAF50;
+            font-size: 13px;
+            margin-bottom: 16px;
+            display: inline-block;
+        }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <h1>🚕 TAXI 3042</h1>
+    <div class="nav">
+        <a href="/">🏠 Главная</a>
+        <a href="/requests">📝 Заявки</a>
+        <a href="/drivers">👥 Водители</a>
+        <a href="/trips">🚕 Поездки</a>
+        <a href="/stats">📊 Статистика</a>
+        <a href="/logout" class="logout">🚪 Выйти</a>
+    </div>
+</div>
+
+<div class="content">
+
+    <div class="page-title">
+        🚕 Поездки
+        <span class="counter">{{ trips|length }}</span>
+    </div>
+
+    <!-- АКТИВНЫЙ ФИЛЬТР -->
+    {% set car_filter  = request.args.get('car',  '') %}
+    {% set date_filter = request.args.get('date', '') %}
+    {% if car_filter %}
+        <div class="active-filter">
+            🚗 Фильтр по авто: <strong>{{ car_filter }}</strong>
+            <a href="/trips" style="color:#ff4444; margin-left:8px;">✕</a>
+        </div>
+    {% endif %}
+    {% if date_filter %}
+        <div class="active-filter">
+            📅 Фильтр по дате: <strong>{{ date_filter }}</strong>
+            <a href="/trips" style="color:#ff4444; margin-left:8px;">✕</a>
+        </div>
+    {% endif %}
+
+    <!-- СТАТИСТИКА -->
+    {% if trips %}
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-value" style="color:#FAD201;">
+                {{ trips|length }}
+            </div>
+            <div class="stat-label">Поездок</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value" style="color:#22c97a;">
+                {% set total = namespace(val=0) %}
+                {% for t in trips %}{% set total.val = total.val + t.price %}{% endfor %}
+                {{ '{:,.0f}'.format(total.val) }} сум
+            </div>
+            <div class="stat-label">Общий заработок</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value" style="color:#60a5fa;">
+                {% set city = namespace(val=0.0) %}
+                {% for t in trips %}{% set city.val = city.val + t.city_distance %}{% endfor %}
+                {{ '{:.1f}'.format(city.val) }} км
+            </div>
+            <div class="stat-label">Км в городе</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value" style="color:#f59e0b;">
+                {% set sub = namespace(val=0.0) %}
+                {% for t in trips %}{% set sub.val = sub.val + t.suburb_distance %}{% endfor %}
+                {{ '{:.1f}'.format(sub.val) }} км
+            </div>
+            <div class="stat-label">Км за городом</div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- ФИЛЬТР -->
+    <form class="filter-form" method="GET">
+        <input
+            name="car"
+            value="{{ car_filter }}"
+            placeholder="🔍 Номер авто..."
+            autocomplete="off"
+            style="width: 200px;"/>
+        <input
+            name="date"
+            type="date"
+            value="{{ date_filter }}"
+            style="color-scheme: dark; width: 180px;"/>
+        <button type="submit">🔍 Найти</button>
+        {% if car_filter or date_filter %}
+            <a href="/trips" class="btn-reset-filter">✕ Сброс</a>
+        {% endif %}
+    </form>
+
+    <!-- ТАБЛИЦА -->
+    <div class="table-wrap">
+        {% if trips %}
+        <table>
+            <tr>
+                <th>#</th>
+                <th>Авто</th>
+                <th>💰 Сумма</th>
+                <th>🏙 Город</th>
+                <th>🛣 Загород</th>
+                <th>📍 Всего км</th>
+                <th>⏱ Ожидание</th>
+                <th>🕐 Длительность</th>
+                <th>📅 Дата и время</th>
+            </tr>
+            {% for trip in trips %}
+            <tr>
+                <td style="color:#555;">{{ loop.index }}</td>
+
+                <td>
+                    <a href="/trips?car={{ trip.car_number }}"
+                       class="car-badge">
+                        {{ trip.car_number }}
+                    </a>
+                </td>
+
+                <td>
+                    <span class="price">
+                        {{ '{:,.0f}'.format(trip.price) }} сум
+                    </span>
+                </td>
+
+                <td>
+                    <span class="dist-city">
+                        {{ '{:.2f}'.format(trip.city_distance) }} км
+                    </span>
+                </td>
+
+                <td>
+                    <span class="dist-suburb">
+                        {{ '{:.2f}'.format(trip.suburb_distance) }} км
+                    </span>
+                </td>
+
+                <td style="color:#eef2f8; font-weight:bold;">
+                    {{ '{:.2f}'.format(trip.city_distance + trip.suburb_distance) }} км
+                </td>
+
+                <td>
+                    <span class="wait-time">
+                        {% set wm = (trip.waiting_seconds // 60) %}
+                        {% set ws = (trip.waiting_seconds % 60) %}
+                        {{ '%02d:%02d'|format(wm, ws) }}
+                    </span>
+                </td>
+
+                <td>
+                    <span class="duration">
+                        {% set th = (trip.total_seconds // 3600) %}
+                        {% set tm = ((trip.total_seconds % 3600) // 60) %}
+                        {% set ts = (trip.total_seconds % 60) %}
+                        {% if th > 0 %}
+                            {{ '%02d:%02d:%02d'|format(th, tm, ts) }}
+                        {% else %}
+                            {{ '%02d:%02d'|format(tm, ts) }}
+                        {% endif %}
+                    </span>
+                </td>
+
+                <td style="color:#555; font-size:12px;">
+                    {{ trip.created_at[:16] }}
+                </td>
+            </tr>
+            {% endfor %}
+        </table>
+        {% else %}
+        <div class="empty">
+            <div class="icon">🚕</div>
+            <p>
+                {% if car_filter or date_filter %}
+                    По данному фильтру поездок не найдено
+                {% else %}
+                    Поездок пока нет
+                {% endif %}
+            </p>
+        </div>
+        {% endif %}
+    </div>
+
+</div>
+
+</body>
+</html>
