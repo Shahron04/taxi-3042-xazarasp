@@ -3,6 +3,7 @@ import logging
 import random
 import sqlite3
 import threading
+import secrets
 from datetime import datetime, timedelta
 from functools import wraps
 
@@ -53,9 +54,24 @@ def init_db():
             pin_expires_at TEXT,
             status TEXT DEFAULT 'pending',
             is_blocked INTEGER DEFAULT 0,
-            created_at TEXT DEFAULT CURRENT_TIMESTAMP
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            balance REAL DEFAULT 0.0,
+            online_status TEXT DEFAULT 'offline',
+            last_seen TEXT DEFAULT NULL
         )
     """)
+
+    # ✅ Добавляем новые колонки если база уже существует
+    for col, definition in [
+        ("balance",       "REAL DEFAULT 0.0"),
+        ("online_status", "TEXT DEFAULT 'offline'"),
+        ("last_seen",     "TEXT DEFAULT NULL"),
+    ]:
+        try:
+            c.execute(f"ALTER TABLE drivers ADD COLUMN {col} {definition}")
+        except:
+            pass
+
     c.execute("""
         CREATE TABLE IF NOT EXISTS logs (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -78,8 +94,16 @@ def init_db():
     conn.close()
     print("✅ База данных готова")
 
+# ==================== ГЕНЕРАЦИЯ PIN ====================
 def generate_pin():
-    return str(random.randint(1000, 9999))
+    conn = get_db()
+    c = conn.cursor()
+    while True:
+        pin = str(secrets.randbelow(9000) + 1000)
+        c.execute("SELECT COUNT(*) FROM drivers WHERE pin = ?", (pin,))
+        if c.fetchone()[0] == 0:
+            conn.close()
+            return pin
 
 def add_log(action, admin_id, driver_id, details):
     conn = get_db()
@@ -111,7 +135,7 @@ def add_driver(tg_id, username, full_name, phone, car_number):
     conn.commit()
     conn.close()
 
-# ✅ НОВАЯ ФУНКЦИЯ — сброс водителя при переустановке
+# ✅ Сброс водителя при переустановке
 def reset_driver(car_number):
     conn = get_db()
     c = conn.cursor()
@@ -120,7 +144,8 @@ def reset_driver(car_number):
         SET status = 'pending',
             pin = NULL,
             pin_created_at = NULL,
-            pin_expires_at = NULL
+            pin_expires_at = NULL,
+            online_status = 'offline'
         WHERE car_number = ?
     """, (car_number.upper(),))
     conn.commit()
@@ -214,7 +239,7 @@ def reject_driver_by_car(car_number):
 def block_driver(tg_id):
     conn = get_db()
     c = conn.cursor()
-    c.execute("UPDATE drivers SET is_blocked = 1 WHERE tg_id = ?", (tg_id,))
+    c.execute("UPDATE drivers SET is_blocked = 1, online_status = 'offline' WHERE tg_id = ?", (tg_id,))
     conn.commit()
     conn.close()
 
@@ -240,6 +265,41 @@ def reset_pin(tg_id):
     conn.commit()
     conn.close()
     return pin
+
+# ✅ Обновить баланс
+def update_balance_db(car_number, amount):
+    conn = get_db()
+    c = conn.cursor()
+    c.execute("""
+        UPDATE drivers 
+        SET balance = balance + ?
+        WHERE car_number = ?
+    """, (amount, car_number.upper()))
+    conn.commit()
+    conn.close()
+
+# ✅ Обновить онлайн статус и последний вход
+def update_online_status(car_number, status):
+    conn = get_db()
+    c = conn.cursor()
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    c.execute("""
+        UPDATE drivers 
+        SET online_status = ?,
+            last_seen = ?
+        WHERE car_number = ?
+    """, (status, now, car_number.upper()))
+    conn.commit()
+    conn.close()
+
+# ✅ Получить баланс
+def get_balance(car_number):
+    conn = get_db()
+    c = conn.cursor()
+    c.execute("SELECT balance FROM drivers WHERE car_number = ?", (car_number.upper(),))
+    row = c.fetchone()
+    conn.close()
+    return row['balance'] if row else 0.0
 
 def search_drivers(query):
     conn = get_db()
@@ -267,6 +327,8 @@ def get_stats():
     stats['rejected'] = c.fetchone()[0]
     c.execute("SELECT COUNT(*) FROM drivers WHERE is_blocked=1")
     stats['blocked'] = c.fetchone()[0]
+    c.execute("SELECT COUNT(*) FROM drivers WHERE online_status IN ('online','free','busy')")
+    stats['online'] = c.fetchone()[0]
     today = datetime.now().strftime("%Y-%m-%d")
     c.execute("SELECT COUNT(*) FROM drivers WHERE created_at LIKE ?", (f"{today}%",))
     stats['today'] = c.fetchone()[0]
@@ -305,7 +367,7 @@ def main_keyboard():
     return ReplyKeyboardMarkup(
         keyboard=[
             [KeyboardButton(text="📝 Регистрация")],
-            [KeyboardButton(text="🔑 Мой PIN")],
+            [KeyboardButton(text="���� Мой PIN")],
             [KeyboardButton(text="📊 Мой статус")],
         ],
         resize_keyboard=True
@@ -487,6 +549,7 @@ async def my_status(message: types.Message):
         f"👤 {driver['full_name']}\n"
         f"📱 {driver['phone']}\n"
         f"🚗 {driver['car_number']}\n"
+        f"💰 Баланс: {driver['balance'] or 0:.0f} сум\n"
         f"📅 {driver['created_at']}"
     )
 
@@ -534,8 +597,10 @@ async def all_drivers(message: types.Message):
     for driver in drivers:
         status = {'pending': '⏳', 'approved': '✅', 'rejected': '❌'}.get(driver['status'], '❓')
         blocked = "🚫" if driver['is_blocked'] else ""
-        text += (f"{status}{blocked} {driver['full_name']} "
+        online = "🟢" if driver['online_status'] in ('online', 'free', 'busy') else "⚫"
+        text += (f"{status}{blocked}{online} {driver['full_name']} "
                  f"| {driver['car_number']}\n"
+                 f"    💰 {driver['balance'] or 0:.0f} сум\n"
                  f"    /info_{driver['tg_id']}\n\n")
     await message.answer(text)
 
@@ -551,6 +616,7 @@ async def statistics(message: types.Message):
         f"⏳ Ожидают: {stats['pending']}\n"
         f"❌ Отклонено: {stats['rejected']}\n"
         f"🚫 Заблокировано: {stats['blocked']}\n"
+        f"🟢 Онлайн: {stats['online']}\n"
         f"📅 Сегодня: {stats['today']}"
     )
 
@@ -587,6 +653,7 @@ async def driver_info(message: types.Message):
         await message.answer("❌ Не найден")
         return
     status_text = {'pending': '⏳', 'approved': '✅', 'rejected': '❌'}
+    online = "🟢 Онлайн" if driver['online_status'] in ('online', 'free', 'busy') else "⚫ Офлайн"
     await message.answer(
         f"👤 {driver['full_name']}\n"
         f"📱 {driver['phone']}\n"
@@ -594,6 +661,9 @@ async def driver_info(message: types.Message):
         f"Статус: {status_text[driver['status']]}\n"
         f"PIN: {driver['pin'] or 'нет'}\n"
         f"До: {driver['pin_expires_at'] or 'нет'}\n"
+        f"💰 Баланс: {driver['balance'] or 0:.0f} сум\n"
+        f"📍 {online}\n"
+        f"🕐 Последний вход: {driver['last_seen'] or 'никогда'}\n"
         f"Блок: {'Да 🚫' if driver['is_blocked'] else 'Нет'}\n\n"
         f"🔄 /resetpin_{tg_id}\n"
         f"🚫 /block_{tg_id}\n"
@@ -764,27 +834,18 @@ def api_register():
         driver = get_driver_by_car(car_number)
 
         if driver:
-            # ✅ Если заблокирован — запрещаем
             if driver['is_blocked']:
                 return jsonify({"success": False, "error": "Аккаунт заблокирован"}), 403
-
-            # ✅ Если pending — не даём подать повторно
             if driver['status'] == 'pending':
                 return jsonify({"success": False, "error": "Заявка уже отправлена, ожидайте"}), 200
-
-            # ✅ Если rejected — не даём зарегистрироваться
             elif driver['status'] == 'rejected':
                 return jsonify({"success": False, "error": "Ваша заявка отклонена"}), 200
-
-            # ✅ Если approved — переустановка, сбрасываем пин и статус
             elif driver['status'] == 'approved':
                 reset_driver(car_number)
                 add_log("reset", 0, 0, f"Переустановка APK: {car_number}")
 
-        # ✅ Добавляем или обновляем водителя
         add_driver(tg_id=0, username=name, full_name=name, phone=phone, car_number=car_number)
 
-        # ✅ Уведомление админу
         async def notify():
             keyboard = InlineKeyboardMarkup(inline_keyboard=[
                 [
@@ -844,24 +905,61 @@ def api_login():
         if driver['pin'] != pin:
             return jsonify({"success": False, "error": "Неверный PIN код"}), 401
 
-        # ✅ Проверка срока действия пина
         if driver['pin_expires_at']:
             expires = datetime.strptime(driver['pin_expires_at'], "%Y-%m-%d %H:%M:%S")
             if datetime.now() > expires:
                 return jsonify({"success": False, "error": "PIN истёк, обратитесь к администратору"}), 403
 
+        # ✅ Обновляем статус и последний вход
+        update_online_status(car_number, 'online')
+
         return jsonify({
             "success": True,
             "driver": {
-                "id":      driver['id'],
-                "name":    driver['full_name'],
-                "car":     driver['car_number'],
-                "balance": 0.0
+                "id":            driver['id'],
+                "name":          driver['full_name'],
+                "car":           driver['car_number'],
+                "balance":       driver['balance'] if driver['balance'] else 0.0,
+                "online_status": "online",
+                "last_seen":     datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             }
         }), 200
 
     except Exception as e:
         logging.error(f"Login error: {e}")
+        return jsonify({"success": False, "error": "Ошибка сервера"}), 500
+
+
+# ✅ Обновление статуса водителя
+@flask_app.route('/api/driver/status', methods=['POST'])
+def api_update_status():
+    try:
+        data       = request.get_json()
+        car_number = data.get('car_number', '').strip().upper()
+        status     = data.get('status', 'online').strip()
+
+        if status not in ['online', 'offline', 'busy', 'free']:
+            return jsonify({"success": False, "error": "Неверный статус"}), 400
+
+        update_online_status(car_number, status)
+        return jsonify({"success": True}), 200
+
+    except Exception as e:
+        logging.error(f"Status error: {e}")
+        return jsonify({"success": False, "error": "Ошибка сервера"}), 500
+
+
+# ✅ Получить баланс
+@flask_app.route('/api/driver/balance', methods=['POST'])
+def api_get_balance():
+    try:
+        data       = request.get_json()
+        car_number = data.get('car_number', '').strip().upper()
+        balance    = get_balance(car_number)
+        return jsonify({"success": True, "balance": balance}), 200
+
+    except Exception as e:
+        logging.error(f"Balance error: {e}")
         return jsonify({"success": False, "error": "Ошибка сервера"}), 500
 
 
