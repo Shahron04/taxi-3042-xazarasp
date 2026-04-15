@@ -437,7 +437,7 @@ def trips_page():
 @admin_required
 def broadcast():
     return render_template('broadcast.html')
-  
+
 # ==================== API для APK ====================
 
 @flask_app.route('/api/driver/register', methods=['POST'])
@@ -557,18 +557,6 @@ def api_check_driver(car_number):
     except Exception as e:
         logging.error(f"Check error: {e}")
         return jsonify({"success": False, "is_blocked": True}), 500
-
-
-@flask_app.route('/api/driver/login', methods=['POST'])
-def api_login():
-    try:
-        data       = request.get_json()
-        car_number = data.get('car_number', '').strip().upper()
-        pin        = data.get('pin', '').strip()
-
-        if not car_number or not pin:
-            return jsonify({"success": False,
-                            "error": "Заполните все поля"}), 400
 
         # ✅ Ищем по car_number И pin одновременно
         conn = get_db()
