@@ -7,7 +7,6 @@
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { background: #0f0f0f; font-family: Arial, sans-serif; color: #fff; }
 
-        /* HEADER */
         .header {
             background: #1a1a1a;
             padding: 16px 24px;
@@ -30,10 +29,8 @@
         .nav a:hover { color: #FAD201; }
         .logout { color: #ff4444 !important; }
 
-        /* CONTENT */
         .content { padding: 30px; max-width: 1600px; margin: 0 auto; }
 
-        /* TITLE */
         .page-title {
             font-size: 22px;
             font-weight: bold;
@@ -49,7 +46,6 @@
             font-weight: normal;
         }
 
-        /* SEARCH */
         .search-form {
             display: flex;
             gap: 10px;
@@ -80,7 +76,6 @@
         }
         .search-form button:hover { opacity: 0.85; }
 
-        /* TABLE */
         .table-wrap {
             background: #1a1a1a;
             border-radius: 12px;
@@ -113,7 +108,6 @@
         tr:last-child td { border-bottom: none; }
         tr:hover td { background: #222; }
 
-        /* BADGES — статус регистрации */
         .badge {
             display: inline-block;
             padding: 4px 12px;
@@ -127,7 +121,6 @@
         .badge-rejected { background: #b71c1c; color: #f44336; }
         .badge-blocked  { background: #2a2a2a; color: #ff4444; }
 
-        /* BADGES — онлайн статус */
         .online-badge {
             display: inline-flex;
             align-items: center;
@@ -152,7 +145,6 @@
         .online-offline { background: #1a1a1a; color: #555; }
         .online-offline .dot { background: #555; }
 
-        /* BUTTONS */
         .btn {
             display: inline-block;
             padding: 6px 12px;
@@ -171,14 +163,9 @@
         .btn-unblock { background: #1b5e20; color: #4CAF50; border: 1px solid #4CAF50; }
         .btn-reset   { background: #e65100; color: #fff; }
 
-        /* BALANCE */
-        .balance {
-            color: #22c97a;
-            font-weight: bold;
-        }
+        .balance { color: #22c97a; font-weight: bold; }
         .balance.zero { color: #444; }
 
-        /* PIN */
         .pin-code {
             color: #FAD201;
             font-weight: bold;
@@ -186,7 +173,6 @@
             letter-spacing: 2px;
         }
 
-        /* EMPTY */
         .empty {
             text-align: center;
             padding: 80px;
@@ -195,7 +181,6 @@
         .empty .icon { font-size: 48px; margin-bottom: 12px; }
         .empty p { font-size: 14px; }
 
-        /* COUNTER */
         .counter {
             display: inline-block;
             background: #2a2a2a;
@@ -227,7 +212,6 @@
         <span class="counter">{{ drivers|length }}</span>
     </div>
 
-    <!-- Поиск -->
     <form class="search-form" method="GET">
         <input
             name="search"
@@ -248,7 +232,6 @@
         {% endif %}
     </form>
 
-    <!-- Таблица -->
     <div class="table-wrap">
         {% if drivers %}
         <table>
@@ -267,10 +250,8 @@
             </tr>
             {% for driver in drivers %}
             <tr>
-                <!-- Номер -->
                 <td style="color:#555;">{{ loop.index }}</td>
 
-                <!-- Имя -->
                 <td>
                     <div style="font-weight:bold; color:#eef2f8;">
                         {{ driver.full_name }}
@@ -282,7 +263,6 @@
                     {% endif %}
                 </td>
 
-                <!-- Авто -->
                 <td>
                     <span style="
                         background:#2a2a2a;
@@ -295,10 +275,8 @@
                     </span>
                 </td>
 
-                <!-- Телефон -->
                 <td style="color:#aaa;">{{ driver.phone or '—' }}</td>
 
-                <!-- Статус -->
                 <td>
                     {% if driver.is_blocked %}
                         <span class="badge badge-blocked">🚫 Заблокирован</span>
@@ -311,7 +289,6 @@
                     {% endif %}
                 </td>
 
-                <!-- PIN -->
                 <td>
                     {% if driver.pin %}
                         <span class="pin-code">{{ driver.pin }}</span>
@@ -325,7 +302,6 @@
                     {% endif %}
                 </td>
 
-                <!-- Баланс -->
                 <td>
                     {% set bal = driver.balance or 0 %}
                     <span class="balance {% if bal == 0 %}zero{% endif %}">
@@ -333,7 +309,6 @@
                     </span>
                 </td>
 
-                <!-- Онлайн статус -->
                 <td>
                     {% set os = driver.online_status or 'offline' %}
                     {% if os == 'online' %}
@@ -355,7 +330,6 @@
                     {% endif %}
                 </td>
 
-                <!-- Последний вход -->
                 <td style="color:#555; font-size:12px;">
                     {% if driver.last_seen %}
                         {{ driver.last_seen[:16] }}
@@ -364,28 +338,27 @@
                     {% endif %}
                 </td>
 
-                <!-- Дата регистрации -->
                 <td style="color:#555; font-size:12px;">
                     {{ driver.created_at[:10] }}
                 </td>
 
-                <!-- Действия -->
+                <!-- ✅ ИСПРАВЛЕНО: используем car_number вместо tg_id -->
                 <td>
-                    <a href="/reset_pin/{{ driver.tg_id }}"
+                    <a href="/reset_pin/{{ driver.car_number }}"
                        class="btn btn-reset"
-                       onclick="return confirm('Сбросить PIN?')">
+                       onclick="return confirm('Сбросить PIN для {{ driver.car_number }}?')">
                        🔄 PIN
                     </a>
                     {% if driver.is_blocked %}
-                        <a href="/unblock/{{ driver.tg_id }}"
+                        <a href="/unblock/{{ driver.car_number }}"
                            class="btn btn-unblock"
-                           onclick="return confirm('Разблокировать?')">
+                           onclick="return confirm('Разблокировать {{ driver.car_number }}?')">
                            ✅ Разблок
                         </a>
                     {% else %}
-                        <a href="/block/{{ driver.tg_id }}"
+                        <a href="/block/{{ driver.car_number }}"
                            class="btn btn-block"
-                           onclick="return confirm('Заблокировать?')">
+                           onclick="return confirm('Заблокировать {{ driver.car_number }}?')">
                            🚫 Блок
                         </a>
                     {% endif %}
