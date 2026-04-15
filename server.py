@@ -1,6 +1,5 @@
 import asyncio
 import logging
-import random
 import sqlite3
 import threading
 import secrets
@@ -12,31 +11,28 @@ from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.storage.memory import MemoryStorage
-from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.types import (ReplyKeyboardMarkup, KeyboardButton,
+                            InlineKeyboardMarkup, InlineKeyboardButton)
 
 from flask import (Flask, render_template, request,
                    redirect, url_for, session, jsonify)
-
 import os
 
 # ==================== НАСТРОЙКИ ====================
-BOT_TOKEN = "8671480651:AAHxDVRUfULTSZRPMMvJ7NO5TfbSS1GqHiQ".strip()
-if not BOT_TOKEN:
-    raise ValueError("BOT_TOKEN is missing or empty")
-
-ADMIN_IDS = [int(x.strip()) for x in os.environ.get("ADMIN_IDS", "123456789").split(",") if x.strip()]
+BOT_TOKEN      = "8671480651:AAHxDVRUfULTSZRPMMvJ7NO5TfbSS1GqHiQ".strip()
+ADMIN_IDS      = [int(x.strip()) for x in os.environ.get("ADMIN_IDS", "123456789").split(",") if x.strip()]
 ADMIN_USERNAME = os.environ.get("ADMIN_USERNAME", "admin").strip()
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "admin123").strip()
-SECRET_KEY = os.environ.get("SECRET_KEY", "taxi2024secret").strip()
+SECRET_KEY     = os.environ.get("SECRET_KEY", "taxi2024secret").strip()
 PIN_EXPIRE_DAYS = 30
-PORT = int(os.environ.get("PORT", 5000))
+PORT           = int(os.environ.get("PORT", 5000))
 
 # ==================== ТАРИФЫ ====================
 class TaxiConfig:
-    BASE_FARE   = 5000.0   # Посадка
-    CITY_RATE   = 2800.0   # За км в городе
-    SUBURB_RATE = 3000.0   # За км за городом
-    WAIT_RATE   = 250.0    # За минуту ожидания
+    BASE_FARE   = 5000.0
+    CITY_RATE   = 2800.0
+    SUBURB_RATE = 3000.0
+    WAIT_RATE   = 500.0  # ✅ сум в минуту
 
     @staticmethod
     def calculatePrice(distKm: float, waitMin: int, isSuburb: bool) -> float:
@@ -54,7 +50,6 @@ def init_db():
     conn = get_db()
     c = conn.cursor()
 
-    # ✅ Таблица водителей
     c.execute("""
         CREATE TABLE IF NOT EXISTS drivers (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -75,7 +70,6 @@ def init_db():
         )
     """)
 
-    # ✅ Добавляем новые колонки если база уже существует
     for col, definition in [
         ("balance",       "REAL DEFAULT 0.0"),
         ("online_status", "TEXT DEFAULT 'offline'"),
@@ -86,7 +80,6 @@ def init_db():
         except:
             pass
 
-    # ✅ Таблица логов
     c.execute("""
         CREATE TABLE IF NOT EXISTS logs (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -98,7 +91,6 @@ def init_db():
         )
     """)
 
-    # ✅ Таблица рассылок
     c.execute("""
         CREATE TABLE IF NOT EXISTS broadcasts (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -108,7 +100,6 @@ def init_db():
         )
     """)
 
-    # ✅ Таблица поездок
     c.execute("""
         CREATE TABLE IF NOT EXISTS trips (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -128,6 +119,7 @@ def init_db():
 
 # ==================== ГЕНЕРАЦИЯ PIN ====================
 def generate_pin():
+    """✅ Генерирует уникальный PIN для каждого водителя"""
     conn = get_db()
     c = conn.cursor()
     while True:
@@ -152,7 +144,7 @@ def add_driver(tg_id, username, full_name, phone, car_number):
     conn = get_db()
     c = conn.cursor()
     c.execute("""
-        INSERT INTO drivers 
+        INSERT INTO drivers
         (tg_id, username, full_name, phone, car_number, status)
         VALUES (?, ?, ?, ?, ?, 'pending')
         ON CONFLICT(car_number) DO UPDATE SET
@@ -172,7 +164,7 @@ def reset_driver(car_number):
     conn = get_db()
     c = conn.cursor()
     c.execute("""
-        UPDATE drivers 
+        UPDATE drivers
         SET status = 'pending',
             pin = NULL,
             pin_created_at = NULL,
@@ -222,7 +214,7 @@ def approve_driver_by_car(car_number):
     conn = get_db()
     c = conn.cursor()
     c.execute("""
-        UPDATE drivers 
+        UPDATE drivers
         SET status = 'approved',
             pin = ?,
             pin_created_at = ?,
@@ -242,7 +234,7 @@ def approve_driver(tg_id):
     conn = get_db()
     c = conn.cursor()
     c.execute("""
-        UPDATE drivers 
+        UPDATE drivers
         SET status = 'approved',
             pin = ?,
             pin_created_at = ?,
@@ -264,14 +256,39 @@ def reject_driver(tg_id):
 def reject_driver_by_car(car_number):
     conn = get_db()
     c = conn.cursor()
-    c.execute("UPDATE drivers SET status = 'rejected' WHERE car_number = ?", (car_number.upper(),))
+    c.execute("UPDATE drivers SET status = 'rejected' WHERE car_number = ?",
+              (car_number.upper(),))
+    conn.commit()
+    conn.close()
+
+# ✅ ИСПРАВЛЕНО: block/unblock по car_number
+def block_driver_by_car(car_number):
+    conn = get_db()
+    c = conn.cursor()
+    c.execute("""
+        UPDATE drivers
+        SET is_blocked = 1, online_status = 'offline'
+        WHERE car_number = ?
+    """, (car_number.upper(),))
+    conn.commit()
+    conn.close()
+
+def unblock_driver_by_car(car_number):
+    conn = get_db()
+    c = conn.cursor()
+    c.execute("UPDATE drivers SET is_blocked = 0 WHERE car_number = ?",
+              (car_number.upper(),))
     conn.commit()
     conn.close()
 
 def block_driver(tg_id):
     conn = get_db()
     c = conn.cursor()
-    c.execute("UPDATE drivers SET is_blocked = 1, online_status = 'offline' WHERE tg_id = ?", (tg_id,))
+    c.execute("""
+        UPDATE drivers
+        SET is_blocked = 1, online_status = 'offline'
+        WHERE tg_id = ?
+    """, (tg_id,))
     conn.commit()
     conn.close()
 
@@ -281,6 +298,24 @@ def unblock_driver(tg_id):
     c.execute("UPDATE drivers SET is_blocked = 0 WHERE tg_id = ?", (tg_id,))
     conn.commit()
     conn.close()
+
+# ✅ ИСПРАВЛЕНО: reset_pin по car_number
+def reset_pin_by_car(car_number):
+    pin = generate_pin()
+    now = datetime.now()
+    expires = now + timedelta(days=PIN_EXPIRE_DAYS)
+    conn = get_db()
+    c = conn.cursor()
+    c.execute("""
+        UPDATE drivers
+        SET pin = ?, pin_created_at = ?, pin_expires_at = ?
+        WHERE car_number = ?
+    """, (pin, now.strftime("%Y-%m-%d %H:%M:%S"),
+          expires.strftime("%Y-%m-%d %H:%M:%S"),
+          car_number.upper()))
+    conn.commit()
+    conn.close()
+    return pin
 
 def reset_pin(tg_id):
     pin = generate_pin()
@@ -302,7 +337,7 @@ def update_balance_db(car_number, amount):
     conn = get_db()
     c = conn.cursor()
     c.execute("""
-        UPDATE drivers 
+        UPDATE drivers
         SET balance = balance + ?
         WHERE car_number = ?
     """, (amount, car_number.upper()))
@@ -314,9 +349,8 @@ def update_online_status(car_number, status):
     c = conn.cursor()
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     c.execute("""
-        UPDATE drivers 
-        SET online_status = ?,
-            last_seen = ?
+        UPDATE drivers
+        SET online_status = ?, last_seen = ?
         WHERE car_number = ?
     """, (status, now, car_number.upper()))
     conn.commit()
@@ -334,9 +368,9 @@ def get_driver_trips(car_number):
     conn = get_db()
     c = conn.cursor()
     c.execute("""
-        SELECT * FROM trips 
-        WHERE car_number = ? 
-        ORDER BY created_at DESC 
+        SELECT * FROM trips
+        WHERE car_number = ?
+        ORDER BY created_at DESC
         LIMIT 50
     """, (car_number.upper(),))
     trips = c.fetchall()
@@ -404,14 +438,15 @@ def get_logs():
 def save_broadcast(message, sent_count):
     conn = get_db()
     c = conn.cursor()
-    c.execute("INSERT INTO broadcasts (message, sent_count) VALUES (?, ?)", (message, sent_count))
+    c.execute("INSERT INTO broadcasts (message, sent_count) VALUES (?, ?)",
+              (message, sent_count))
     conn.commit()
     conn.close()
 
 # ==================== БОТ ====================
-bot = Bot(token=BOT_TOKEN)
+bot     = Bot(token=BOT_TOKEN)
 storage = MemoryStorage()
-dp = Dispatcher(storage=storage)
+dp      = Dispatcher(storage=storage)
 
 class DriverReg(StatesGroup):
     full_name  = State()
@@ -453,7 +488,8 @@ def admin_keyboard():
 @dp.message(Command("start"))
 async def start(message: types.Message):
     if message.from_user.id in ADMIN_IDS:
-        await message.answer("👋 Добро пожаловать, Администратор!", reply_markup=admin_keyboard())
+        await message.answer("👋 Добро пожаловать, Администратор!",
+                             reply_markup=admin_keyboard())
     else:
         await message.answer(
             "👋 Добро пожаловать!\n\n"
@@ -464,18 +500,16 @@ async def start(message: types.Message):
             reply_markup=main_keyboard()
         )
 
-# ==================== CALLBACK КНОПКИ ====================
+# ==================== CALLBACK ====================
 
 @dp.callback_query(lambda c: c.data and c.data.startswith("approve_"))
 async def callback_approve(callback: types.CallbackQuery):
     if callback.from_user.id not in ADMIN_IDS:
         await callback.answer("❌ Нет доступа!")
         return
-
     car_number = callback.data.replace("approve_", "", 1)
     pin = approve_driver_by_car(car_number)
     add_log("approve", callback.from_user.id, 0, f"Авто: {car_number} PIN: {pin}")
-
     await callback.message.edit_text(
         f"✅ Водитель одобрен!\n\n"
         f"🚗 Авто: {car_number}\n"
@@ -490,14 +524,11 @@ async def callback_reject(callback: types.CallbackQuery):
     if callback.from_user.id not in ADMIN_IDS:
         await callback.answer("❌ Нет доступа!")
         return
-
     car_number = callback.data.replace("reject_", "", 1)
     reject_driver_by_car(car_number)
     add_log("reject", callback.from_user.id, 0, f"Авто: {car_number}")
-
     await callback.message.edit_text(
-        f"❌ Водитель отклонён!\n\n"
-        f"🚗 Авто: {car_number}"
+        f"❌ Водитель отклонён!\n\n🚗 Авто: {car_number}"
     )
     await callback.answer("❌ Отклонено!")
 
@@ -534,7 +565,8 @@ async def get_full_name(message: types.Message, state: FSMContext):
 async def get_phone(message: types.Message, state: FSMContext):
     phone = message.contact.phone_number if message.contact else message.text
     await state.update_data(phone=phone)
-    await message.answer("🚗 Введите номер автомобиля:", reply_markup=types.ReplyKeyboardRemove())
+    await message.answer("🚗 Введите номер автомобиля:",
+                         reply_markup=types.ReplyKeyboardRemove())
     await state.set_state(DriverReg.car_number)
 
 @dp.message(DriverReg.car_number)
@@ -548,14 +580,19 @@ async def get_car_number(message: types.Message, state: FSMContext):
         car_number=message.text
     )
     await state.clear()
-    await message.answer("✅ Заявка отправлена!\n⏳ Ожидайте одобрения", reply_markup=main_keyboard())
+    await message.answer("✅ Заявка отправлена!\n⏳ Ожидайте одобрения",
+                         reply_markup=main_keyboard())
 
-    keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [
-            InlineKeyboardButton(text="✅ Одобрить", callback_data=f"approve_{message.text.upper()}"),
-            InlineKeyboardButton(text="❌ Отклонить", callback_data=f"reject_{message.text.upper()}")
-        ]
-    ])
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[[
+        InlineKeyboardButton(
+            text="✅ Одобрить",
+            callback_data=f"approve_{message.text.upper()}"
+        ),
+        InlineKeyboardButton(
+            text="❌ Отклонить",
+            callback_data=f"reject_{message.text.upper()}"
+        )
+    ]])
     for admin_id in ADMIN_IDS:
         try:
             await bot.send_message(
@@ -624,18 +661,16 @@ async def pending_list(message: types.Message):
         await message.answer("📭 Нет новых заявок")
         return
     for driver in drivers:
-        keyboard = InlineKeyboardMarkup(inline_keyboard=[
-            [
-                InlineKeyboardButton(
-                    text="✅ Одобрить",
-                    callback_data=f"approve_{driver['car_number']}"
-                ),
-                InlineKeyboardButton(
-                    text="❌ Отклонить",
-                    callback_data=f"reject_{driver['car_number']}"
-                )
-            ]
-        ])
+        keyboard = InlineKeyboardMarkup(inline_keyboard=[[
+            InlineKeyboardButton(
+                text="✅ Одобрить",
+                callback_data=f"approve_{driver['car_number']}"
+            ),
+            InlineKeyboardButton(
+                text="❌ Отклонить",
+                callback_data=f"reject_{driver['car_number']}"
+            )
+        ]])
         await message.answer(
             f"🆕 Заявка\n\n"
             f"👤 {driver['full_name']}\n"
@@ -655,7 +690,7 @@ async def all_drivers(message: types.Message):
         return
     text = "👥 Водители:\n\n"
     for driver in drivers:
-        status = {'pending': '⏳', 'approved': '✅', 'rejected': '❌'}.get(driver['status'], '❓')
+        status  = {'pending': '⏳', 'approved': '✅', 'rejected': '❌'}.get(driver['status'], '❓')
         blocked = "🚫" if driver['is_blocked'] else ""
         online  = "🟢" if driver['online_status'] in ('online', 'free', 'busy') else "⚫"
         text += (f"{status}{blocked}{online} {driver['full_name']} "
@@ -700,7 +735,8 @@ async def broadcast_send(message: types.Message, state: FSMContext):
     for driver in drivers:
         if driver['status'] == 'approved' and not driver['is_blocked']:
             try:
-                await bot.send_message(driver['tg_id'], f"📢 Сообщение:\n\n{message.text}")
+                await bot.send_message(driver['tg_id'],
+                                       f"📢 Сообщение:\n\n{message.text}")
                 sent += 1
             except:
                 failed += 1
@@ -711,16 +747,14 @@ async def broadcast_send(message: types.Message, state: FSMContext):
 async def driver_info(message: types.Message):
     if message.from_user.id not in ADMIN_IDS:
         return
-    tg_id = int(message.text.split("_")[1])
+    tg_id  = int(message.text.split("_")[1])
     driver = get_driver(tg_id)
     if not driver:
         await message.answer("❌ Не найден")
         return
     status_text = {'pending': '⏳', 'approved': '✅', 'rejected': '❌'}
-    online = "🟢 Онлайн" if driver['online_status'] in ('online', 'free', 'busy') else "⚫ Офлайн"
-
-    # Статистика поездок
-    trips = get_driver_trips(driver['car_number'])
+    online      = "🟢 Онлайн" if driver['online_status'] in ('online', 'free', 'busy') else "⚫ Офлайн"
+    trips       = get_driver_trips(driver['car_number'])
     trips_count    = len(trips)
     trips_earnings = sum(t['price'] for t in trips)
 
@@ -737,7 +771,7 @@ async def driver_info(message: types.Message):
         f"🚕 Поездок: {trips_count}\n"
         f"💵 Заработано: {trips_earnings:,.0f} сум\n"
         f"Блок: {'Да 🚫' if driver['is_blocked'] else 'Нет'}\n\n"
-        f"🔄 /resetpin_{tg_id}\n"
+        f"🔄 /resetpin_{driver['car_number']}\n"
         f"🚫 /block_{tg_id}\n"
         f"✅ /unblock_{tg_id}"
     )
@@ -772,18 +806,10 @@ async def unblock(message: types.Message):
 async def reset_pin_cmd(message: types.Message):
     if message.from_user.id not in ADMIN_IDS:
         return
-    tg_id = int(message.text.split("_")[1])
-    pin = reset_pin(tg_id)
-    add_log("reset_pin", message.from_user.id, tg_id, f"PIN: {pin}")
+    car_number = message.text.split("_")[1]
+    pin = reset_pin_by_car(car_number)
+    add_log("reset_pin", message.from_user.id, 0, f"Авто: {car_number} PIN: {pin}")
     await message.answer(f"🔄 Новый PIN: {pin}")
-    try:
-        await bot.send_message(
-            tg_id,
-            f"🔄 PIN сброшен!\n\n🔑 Новый PIN: <b>{pin}</b>",
-            parse_mode="HTML"
-        )
-    except:
-        pass
 
 # ==================== FLASK ====================
 flask_app = Flask(__name__, template_folder='.')
@@ -843,25 +869,26 @@ def web_reject(tg_id):
     add_log("reject", 0, tg_id, "Отклонен")
     return redirect(url_for('requests_page'))
 
-@flask_app.route('/block/<int:tg_id>')
+# ✅ ИСПРАВЛЕНО: используем car_number
+@flask_app.route('/block/<car_number>')
 @admin_required
-def web_block(tg_id):
-    block_driver(tg_id)
-    add_log("block", 0, tg_id, "Заблокирован")
+def web_block(car_number):
+    block_driver_by_car(car_number)
+    add_log("block", 0, 0, f"Авто: {car_number}")
     return redirect(url_for('drivers'))
 
-@flask_app.route('/unblock/<int:tg_id>')
+@flask_app.route('/unblock/<car_number>')
 @admin_required
-def web_unblock(tg_id):
-    unblock_driver(tg_id)
-    add_log("unblock", 0, tg_id, "Разблокирован")
+def web_unblock(car_number):
+    unblock_driver_by_car(car_number)
+    add_log("unblock", 0, 0, f"Авто: {car_number}")
     return redirect(url_for('drivers'))
 
-@flask_app.route('/reset_pin/<int:tg_id>')
+@flask_app.route('/reset_pin/<car_number>')
 @admin_required
-def web_reset_pin(tg_id):
-    pin = reset_pin(tg_id)
-    add_log("reset_pin", 0, tg_id, f"PIN: {pin}")
+def web_reset_pin(car_number):
+    pin = reset_pin_by_car(car_number)
+    add_log("reset_pin", 0, 0, f"Авто: {car_number} PIN: {pin}")
     return redirect(url_for('drivers'))
 
 @flask_app.route('/stats')
@@ -878,24 +905,26 @@ def trips_page():
 @admin_required
 def broadcast():
     if request.method == 'POST':
-        msg = request.form.get('message')
-        sent = 0
+        msg    = request.form.get('message')
+        sent   = 0
         failed = 0
         async def send_all():
             nonlocal sent, failed
             for driver in get_all_drivers():
                 if driver['status'] == 'approved' and not driver['is_blocked']:
                     try:
-                        await bot.send_message(driver['tg_id'], f"📢 Сообщение:\n\n{msg}")
+                        await bot.send_message(driver['tg_id'],
+                                               f"📢 Сообщение:\n\n{msg}")
                         sent += 1
                     except:
                         failed += 1
         asyncio.run(send_all())
         save_broadcast(msg, sent)
-        return render_template('broadcast.html', success=True, sent=sent, failed=failed)
+        return render_template('broadcast.html', success=True,
+                               sent=sent, failed=failed)
     return render_template('broadcast.html')
 
-# ==================== API для APK ====================
+# ==================== API ====================
 
 @flask_app.route('/api/driver/register', methods=['POST'])
 def api_register():
@@ -914,28 +943,29 @@ def api_register():
             if driver['is_blocked']:
                 return jsonify({"success": False, "error": "Аккаунт заблокирован"}), 403
             if driver['status'] == 'pending':
-                return jsonify({"success": False, "error": "Заявка уже отправлена, ожидайте"}), 200
+                return jsonify({"success": False,
+                                "error": "Заявка уже отправлена, ожидайте"}), 200
             elif driver['status'] == 'rejected':
-                return jsonify({"success": False, "error": "Ваша заявка отклонена"}), 200
+                return jsonify({"success": False,
+                                "error": "Ваша заявка отклонена"}), 200
             elif driver['status'] == 'approved':
                 reset_driver(car_number)
                 add_log("reset", 0, 0, f"Переустановка APK: {car_number}")
 
-        add_driver(tg_id=0, username=name, full_name=name, phone=phone, car_number=car_number)
+        add_driver(tg_id=0, username=name, full_name=name,
+                   phone=phone, car_number=car_number)
 
         async def notify():
-            keyboard = InlineKeyboardMarkup(inline_keyboard=[
-                [
-                    InlineKeyboardButton(
-                        text="✅ Одобрить",
-                        callback_data=f"approve_{car_number}"
-                    ),
-                    InlineKeyboardButton(
-                        text="❌ Отклонить",
-                        callback_data=f"reject_{car_number}"
-                    )
-                ]
-            ])
+            keyboard = InlineKeyboardMarkup(inline_keyboard=[[
+                InlineKeyboardButton(
+                    text="✅ Одобрить",
+                    callback_data=f"approve_{car_number}"
+                ),
+                InlineKeyboardButton(
+                    text="❌ Отклонить",
+                    callback_data=f"reject_{car_number}"
+                )
+            ]])
             for admin_id in ADMIN_IDS:
                 try:
                     await bot.send_message(
@@ -950,7 +980,8 @@ def api_register():
                     logging.error(f"Notify error: {e}")
 
         asyncio.run(notify())
-        return jsonify({"success": True, "message": "Заявка отправлена! Ожидайте PIN"}), 200
+        return jsonify({"success": True,
+                        "message": "Заявка отправлена! Ожидайте PIN"}), 200
 
     except Exception as e:
         logging.error(f"Register error: {e}")
@@ -967,7 +998,7 @@ def api_login():
         if not car_number or not pin:
             return jsonify({"success": False, "error": "Заполните все поля"}), 400
 
-        # ✅ Ищем водителя по ОБОИМ полям сразу
+        # ✅ Ищем по car_number И pin одновременно
         conn = get_db()
         c = conn.cursor()
         c.execute(
@@ -978,17 +1009,21 @@ def api_login():
         conn.close()
 
         if not driver:
-            return jsonify({"success": False, "error": "Неверный номер авто или PIN"}), 401
+            return jsonify({"success": False,
+                            "error": "Неверный номер авто или PIN"}), 401
         if driver['is_blocked']:
-            return jsonify({"success": False, "error": "Аккаунт заблокирован"}), 403
+            return jsonify({"success": False,
+                            "error": "Аккаунт заблокирован"}), 403
         if driver['status'] != 'approved':
-            return jsonify({"success": False, "error": "Заявка ещё не одобрена"}), 403
+            return jsonify({"success": False,
+                            "error": "Заявка ещё не одобрена"}), 403
 
-        # ✅ Проверка срока PIN
         if driver['pin_expires_at']:
-            expires = datetime.strptime(driver['pin_expires_at'], "%Y-%m-%d %H:%M:%S")
+            expires = datetime.strptime(driver['pin_expires_at'],
+                                        "%Y-%m-%d %H:%M:%S")
             if datetime.now() > expires:
-                return jsonify({"success": False, "error": "PIN истёк"}), 403
+                return jsonify({"success": False,
+                                "error": "PIN истёк, обратитесь к администратору"}), 403
 
         update_online_status(car_number, 'online')
 
@@ -1054,7 +1089,7 @@ def api_save_trip():
         conn = get_db()
         c    = conn.cursor()
         c.execute("""
-            INSERT INTO trips 
+            INSERT INTO trips
             (car_number, price, city_distance, suburb_distance,
              waiting_seconds, total_seconds, created_at)
             VALUES (?, ?, ?, ?, ?, ?, ?)
@@ -1071,7 +1106,6 @@ def api_save_trip():
             f"Цена: {price:,} сум | "
             f"Км: {city_distance:.1f}+{suburb_distance:.1f}"
         )
-
         return jsonify({"success": True}), 200
 
     except Exception as e:
@@ -1125,7 +1159,7 @@ def run_bot():
 
 init_db()
 
-bot_thread = threading.Thread(target=run_bot)
+bot_thread        = threading.Thread(target=run_bot)
 bot_thread.daemon = True
 bot_thread.start()
 
