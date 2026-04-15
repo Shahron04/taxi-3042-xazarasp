@@ -19,7 +19,6 @@ from flask import (Flask, render_template, request,
 import os
 
 # ==================== НАСТРОЙКИ ====================
-BOT_TOKEN      = "8671480651:AAHxDVRUfULTSZRPMMvJ7NO5TfbSS1GqHiQ".strip()
 ADMIN_IDS      = [int(x.strip()) for x in os.environ.get("ADMIN_IDS", "123456789").split(",") if x.strip()]
 ADMIN_USERNAME = os.environ.get("ADMIN_USERNAME", "admin").strip()
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "admin123").strip()
