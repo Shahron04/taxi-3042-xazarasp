@@ -1,7 +1,5 @@
-import asyncio
 import logging
 import sqlite3
-import threading
 import secrets
 from datetime import datetime, timedelta
 from functools import wraps
@@ -268,6 +266,14 @@ def get_balance(car_number):
     conn.close()
     return row['balance'] if row else 0.0
 
+def get_all_trips():
+    conn = get_db()
+    c = conn.cursor()
+    c.execute("SELECT * FROM trips ORDER BY created_at DESC LIMIT 200")
+    trips = c.fetchall()
+    conn.close()
+    return trips
+
 def get_driver_trips(car_number):
     conn = get_db()
     c = conn.cursor()
@@ -275,16 +281,8 @@ def get_driver_trips(car_number):
         SELECT * FROM trips
         WHERE car_number = ?
         ORDER BY created_at DESC
-        LIMIT 50
+        LIMIT 100
     """, (car_number.upper(),))
-    trips = c.fetchall()
-    conn.close()
-    return trips
-
-def get_all_trips():
-    conn = get_db()
-    c = conn.cursor()
-    c.execute("SELECT * FROM trips ORDER BY created_at DESC LIMIT 100")
     trips = c.fetchall()
     conn.close()
     return trips
@@ -425,10 +423,40 @@ def web_reset_pin(car_number):
 def stats():
     return render_template('stats.html', stats=get_stats(), logs=get_logs())
 
+# ✅ Поездки с фильтрацией
 @flask_app.route('/trips')
 @admin_required
 def trips_page():
-    return render_template('trips.html', trips=get_all_trips(), stats=get_stats())
+    car  = request.args.get('car',  '').strip().upper()
+    date = request.args.get('date', '').strip()
+
+    conn = get_db()
+    c    = conn.cursor()
+
+    if car and date:
+        c.execute("""
+            SELECT * FROM trips
+            WHERE car_number = ? AND created_at LIKE ?
+            ORDER BY created_at DESC
+        """, (car, f"{date}%"))
+    elif car:
+        c.execute("""
+            SELECT * FROM trips
+            WHERE car_number = ?
+            ORDER BY created_at DESC
+        """, (car,))
+    elif date:
+        c.execute("""
+            SELECT * FROM trips
+            WHERE created_at LIKE ?
+            ORDER BY created_at DESC
+        """, (f"{date}%",))
+    else:
+        c.execute("SELECT * FROM trips ORDER BY created_at DESC LIMIT 200")
+
+    trips = c.fetchall()
+    conn.close()
+    return render_template('trips.html', trips=trips)
 
 @flask_app.route('/broadcast', methods=['GET', 'POST'])
 @admin_required
@@ -532,7 +560,6 @@ def api_login():
         return jsonify({"success": False, "error": "Ошибка сервера"}), 500
 
 
-# ✅ Проверка статуса водителя (блокировка)
 @flask_app.route('/api/driver/check/<car_number>', methods=['GET'])
 def api_check_driver(car_number):
     try:
@@ -625,7 +652,6 @@ def api_save_trip():
         return jsonify({"success": False, "error": "Ошибка сервера"}), 500
 
 
-# ✅ Получить историю поездок водителя
 @flask_app.route('/api/driver/trips/<car_number>', methods=['GET'])
 def api_get_driver_trips(car_number):
     try:
