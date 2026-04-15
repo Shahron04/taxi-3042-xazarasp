@@ -674,6 +674,43 @@ def api_save_trip():
         return jsonify({"success": False, "error": "Ошибка сервера"}), 500
 
 
+# ✅ Получить историю поездок водителя
+@flask_app.route('/api/driver/trips/<car_number>', methods=['GET'])
+def api_get_driver_trips(car_number):
+    try:
+        conn = get_db()
+        c = conn.cursor()
+        c.execute("""
+            SELECT * FROM trips 
+            WHERE car_number = ? 
+            ORDER BY created_at DESC
+            LIMIT 100
+        """, (car_number.upper(),))
+        trips = c.fetchall()
+        conn.close()
+
+        trips_list = []
+        for trip in trips:
+            trips_list.append({
+                "id":              trip['id'],
+                "price":           trip['price'],
+                "city_distance":   trip['city_distance'],
+                "suburb_distance": trip['suburb_distance'],
+                "waiting_seconds": trip['waiting_seconds'],
+                "total_seconds":   trip['total_seconds'],
+                "created_at":      trip['created_at']
+            })
+
+        return jsonify({
+            "success": True,
+            "trips":   trips_list
+        }), 200
+
+    except Exception as e:
+        logging.error(f"Trips error: {e}")
+        return jsonify({"success": False, "error": "Ошибка сервера"}), 500
+
+
 @flask_app.route('/api/tariffs', methods=['GET'])
 def api_get_tariffs():
     try:
