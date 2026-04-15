@@ -31,6 +31,18 @@ SECRET_KEY = os.environ.get("SECRET_KEY", "taxi2024secret").strip()
 PIN_EXPIRE_DAYS = 30
 PORT = int(os.environ.get("PORT", 5000))
 
+# ==================== ТАРИФЫ ====================
+class TaxiConfig:
+    BASE_FARE   = 5000.0   # Посадка
+    CITY_RATE   = 2800.0   # За км в городе
+    SUBURB_RATE = 3000.0   # За км за городом
+    WAIT_RATE   = 250.0    # За минуту ожидания
+
+    @staticmethod
+    def calculatePrice(distKm: float, waitMin: int, isSuburb: bool) -> float:
+        rate = TaxiConfig.SUBURB_RATE if isSuburb else TaxiConfig.CITY_RATE
+        return TaxiConfig.BASE_FARE + (distKm * rate) + (waitMin * TaxiConfig.WAIT_RATE)
+
 # ==================== БАЗА ДАННЫХ ====================
 def get_db():
     conn = sqlite3.connect("taxi.db")
@@ -41,6 +53,8 @@ def init_db():
     print("🔧 Инициализация базы данных...")
     conn = get_db()
     c = conn.cursor()
+
+    # ✅ Таблица водителей
     c.execute("""
         CREATE TABLE IF NOT EXISTS drivers (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -72,6 +86,7 @@ def init_db():
         except:
             pass
 
+    # ✅ Таблица логов
     c.execute("""
         CREATE TABLE IF NOT EXISTS logs (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -82,6 +97,8 @@ def init_db():
             created_at TEXT DEFAULT CURRENT_TIMESTAMP
         )
     """)
+
+    # ✅ Таблица рассылок
     c.execute("""
         CREATE TABLE IF NOT EXISTS broadcasts (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -90,6 +107,21 @@ def init_db():
             created_at TEXT DEFAULT CURRENT_TIMESTAMP
         )
     """)
+
+    # ✅ Таблица поездок
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS trips (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            car_number TEXT,
+            price INTEGER,
+            city_distance REAL,
+            suburb_distance REAL,
+            waiting_seconds INTEGER,
+            total_seconds INTEGER,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
     conn.commit()
     conn.close()
     print("✅ База данных готова")
@@ -105,6 +137,7 @@ def generate_pin():
             conn.close()
             return pin
 
+# ==================== ФУНКЦИИ БД ====================
 def add_log(action, admin_id, driver_id, details):
     conn = get_db()
     c = conn.cursor()
@@ -135,7 +168,6 @@ def add_driver(tg_id, username, full_name, phone, car_number):
     conn.commit()
     conn.close()
 
-# ✅ Сброс водителя при переустановке
 def reset_driver(car_number):
     conn = get_db()
     c = conn.cursor()
@@ -266,7 +298,6 @@ def reset_pin(tg_id):
     conn.close()
     return pin
 
-# ✅ Обновить баланс
 def update_balance_db(car_number, amount):
     conn = get_db()
     c = conn.cursor()
@@ -278,7 +309,6 @@ def update_balance_db(car_number, amount):
     conn.commit()
     conn.close()
 
-# ✅ Обновить онлайн статус и последний вход
 def update_online_status(car_number, status):
     conn = get_db()
     c = conn.cursor()
@@ -292,7 +322,6 @@ def update_online_status(car_number, status):
     conn.commit()
     conn.close()
 
-# ✅ Получить баланс
 def get_balance(car_number):
     conn = get_db()
     c = conn.cursor()
@@ -300,6 +329,27 @@ def get_balance(car_number):
     row = c.fetchone()
     conn.close()
     return row['balance'] if row else 0.0
+
+def get_driver_trips(car_number):
+    conn = get_db()
+    c = conn.cursor()
+    c.execute("""
+        SELECT * FROM trips 
+        WHERE car_number = ? 
+        ORDER BY created_at DESC 
+        LIMIT 50
+    """, (car_number.upper(),))
+    trips = c.fetchall()
+    conn.close()
+    return trips
+
+def get_all_trips():
+    conn = get_db()
+    c = conn.cursor()
+    c.execute("SELECT * FROM trips ORDER BY created_at DESC LIMIT 100")
+    trips = c.fetchall()
+    conn.close()
+    return trips
 
 def search_drivers(query):
     conn = get_db()
@@ -332,6 +382,14 @@ def get_stats():
     today = datetime.now().strftime("%Y-%m-%d")
     c.execute("SELECT COUNT(*) FROM drivers WHERE created_at LIKE ?", (f"{today}%",))
     stats['today'] = c.fetchone()[0]
+    c.execute("SELECT COUNT(*) FROM trips WHERE created_at LIKE ?", (f"{today}%",))
+    stats['trips_today'] = c.fetchone()[0]
+    c.execute("SELECT COALESCE(SUM(price), 0) FROM trips WHERE created_at LIKE ?", (f"{today}%",))
+    stats['earnings_today'] = c.fetchone()[0]
+    c.execute("SELECT COUNT(*) FROM trips")
+    stats['trips_total'] = c.fetchone()[0]
+    c.execute("SELECT COALESCE(SUM(price), 0) FROM trips")
+    stats['earnings_total'] = c.fetchone()[0]
     conn.close()
     return stats
 
@@ -367,7 +425,7 @@ def main_keyboard():
     return ReplyKeyboardMarkup(
         keyboard=[
             [KeyboardButton(text="📝 Регистрация")],
-            [KeyboardButton(text="���� Мой PIN")],
+            [KeyboardButton(text="🔑 Мой PIN")],
             [KeyboardButton(text="📊 Мой статус")],
         ],
         resize_keyboard=True
@@ -544,12 +602,14 @@ async def my_status(message: types.Message):
         'rejected': '❌ Отклонен'
     }
     blocked = "🚫" if driver['is_blocked'] else ""
+    online  = "🟢" if driver['online_status'] in ('online', 'free', 'busy') else "⚫"
     await message.answer(
         f"📊 Статус: {status_text[driver['status']]} {blocked}\n\n"
         f"👤 {driver['full_name']}\n"
         f"📱 {driver['phone']}\n"
         f"🚗 {driver['car_number']}\n"
         f"💰 Баланс: {driver['balance'] or 0:.0f} сум\n"
+        f"📍 {online} Онлайн статус\n"
         f"📅 {driver['created_at']}"
     )
 
@@ -597,7 +657,7 @@ async def all_drivers(message: types.Message):
     for driver in drivers:
         status = {'pending': '⏳', 'approved': '✅', 'rejected': '❌'}.get(driver['status'], '❓')
         blocked = "🚫" if driver['is_blocked'] else ""
-        online = "🟢" if driver['online_status'] in ('online', 'free', 'busy') else "⚫"
+        online  = "🟢" if driver['online_status'] in ('online', 'free', 'busy') else "⚫"
         text += (f"{status}{blocked}{online} {driver['full_name']} "
                  f"| {driver['car_number']}\n"
                  f"    💰 {driver['balance'] or 0:.0f} сум\n"
@@ -611,13 +671,17 @@ async def statistics(message: types.Message):
     stats = get_stats()
     await message.answer(
         f"📊 Статистика:\n\n"
-        f"👥 Всего: {stats['total']}\n"
+        f"👥 Всего водителей: {stats['total']}\n"
         f"✅ Одобрено: {stats['approved']}\n"
         f"⏳ Ожидают: {stats['pending']}\n"
         f"❌ Отклонено: {stats['rejected']}\n"
         f"🚫 Заблокировано: {stats['blocked']}\n"
         f"🟢 Онлайн: {stats['online']}\n"
-        f"📅 Сегодня: {stats['today']}"
+        f"📅 Новых сегодня: {stats['today']}\n\n"
+        f"🚕 Поездок сегодня: {stats['trips_today']}\n"
+        f"💰 Заработок сегодня: {stats['earnings_today']:,.0f} сум\n"
+        f"🚕 Поездок всего: {stats['trips_total']}\n"
+        f"💰 Заработок всего: {stats['earnings_total']:,.0f} сум"
     )
 
 @dp.message(lambda m: m.text == "📢 Рассылка")
@@ -654,6 +718,12 @@ async def driver_info(message: types.Message):
         return
     status_text = {'pending': '⏳', 'approved': '✅', 'rejected': '❌'}
     online = "🟢 Онлайн" if driver['online_status'] in ('online', 'free', 'busy') else "⚫ Офлайн"
+
+    # Статистика поездок
+    trips = get_driver_trips(driver['car_number'])
+    trips_count    = len(trips)
+    trips_earnings = sum(t['price'] for t in trips)
+
     await message.answer(
         f"👤 {driver['full_name']}\n"
         f"📱 {driver['phone']}\n"
@@ -664,6 +734,8 @@ async def driver_info(message: types.Message):
         f"💰 Баланс: {driver['balance'] or 0:.0f} сум\n"
         f"📍 {online}\n"
         f"🕐 Последний вход: {driver['last_seen'] or 'никогда'}\n"
+        f"🚕 Поездок: {trips_count}\n"
+        f"💵 Заработано: {trips_earnings:,.0f} сум\n"
         f"Блок: {'Да 🚫' if driver['is_blocked'] else 'Нет'}\n\n"
         f"🔄 /resetpin_{tg_id}\n"
         f"🚫 /block_{tg_id}\n"
@@ -797,6 +869,11 @@ def web_reset_pin(tg_id):
 def stats():
     return render_template('stats.html', stats=get_stats(), logs=get_logs())
 
+@flask_app.route('/trips')
+@admin_required
+def trips_page():
+    return render_template('trips.html', trips=get_all_trips(), stats=get_stats())
+
 @flask_app.route('/broadcast', methods=['GET', 'POST'])
 @admin_required
 def broadcast():
@@ -823,7 +900,7 @@ def broadcast():
 @flask_app.route('/api/driver/register', methods=['POST'])
 def api_register():
     try:
-        data = request.get_json()
+        data       = request.get_json()
         name       = data.get('name', '').strip()
         car_number = data.get('car_number', '').strip().upper()
         phone      = data.get('phone', '').strip()
@@ -866,14 +943,13 @@ def api_register():
                         f"🆕 Новая заявка из APK!\n\n"
                         f"👤 Имя: {name}\n"
                         f"🚗 Авто: {car_number}\n"
-                        f"📱 Device: {phone}",
+                        f"📱 Телефон: {phone}",
                         reply_markup=keyboard
                     )
                 except Exception as e:
                     logging.error(f"Notify error: {e}")
 
         asyncio.run(notify())
-
         return jsonify({"success": True, "message": "Заявка отправлена! Ожидайте PIN"}), 200
 
     except Exception as e:
@@ -895,13 +971,10 @@ def api_login():
 
         if not driver:
             return jsonify({"success": False, "error": "Водитель не найден"}), 404
-
         if driver['is_blocked']:
             return jsonify({"success": False, "error": "Аккаунт заблокирован"}), 403
-
         if driver['status'] != 'approved':
             return jsonify({"success": False, "error": "Заявка ещё не одобрена"}), 403
-
         if driver['pin'] != pin:
             return jsonify({"success": False, "error": "Неверный PIN код"}), 401
 
@@ -930,7 +1003,6 @@ def api_login():
         return jsonify({"success": False, "error": "Ошибка сервера"}), 500
 
 
-# ✅ Обновление статуса водителя
 @flask_app.route('/api/driver/status', methods=['POST'])
 def api_update_status():
     try:
@@ -949,7 +1021,6 @@ def api_update_status():
         return jsonify({"success": False, "error": "Ошибка сервера"}), 500
 
 
-# ✅ Получить баланс
 @flask_app.route('/api/driver/balance', methods=['POST'])
 def api_get_balance():
     try:
@@ -961,6 +1032,80 @@ def api_get_balance():
     except Exception as e:
         logging.error(f"Balance error: {e}")
         return jsonify({"success": False, "error": "Ошибка сервера"}), 500
+
+
+@flask_app.route('/api/driver/trip', methods=['POST'])
+def api_save_trip():
+    try:
+        data            = request.get_json()
+        car_number      = data.get('car_number', '').strip().upper()
+        price           = data.get('price', 0)
+        city_distance   = data.get('city_distance', 0.0)
+        suburb_distance = data.get('suburb_distance', 0.0)
+        waiting_seconds = data.get('waiting_seconds', 0)
+        total_seconds   = data.get('total_seconds', 0)
+
+        conn = get_db()
+        c    = conn.cursor()
+        c.execute("""
+            INSERT INTO trips 
+            (car_number, price, city_distance, suburb_distance,
+             waiting_seconds, total_seconds, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        """, (
+            car_number, price, city_distance, suburb_distance,
+            waiting_seconds, total_seconds,
+            datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        ))
+        conn.commit()
+        conn.close()
+
+        add_log("trip", 0, 0,
+            f"Авто: {car_number} | "
+            f"Цена: {price:,} сум | "
+            f"Км: {city_distance:.1f}+{suburb_distance:.1f}"
+        )
+
+        return jsonify({"success": True}), 200
+
+    except Exception as e:
+        logging.error(f"Trip error: {e}")
+        return jsonify({"success": False, "error": "Ошибка сервера"}), 500
+
+
+@flask_app.route('/api/tariffs', methods=['GET'])
+def api_get_tariffs():
+    try:
+        return jsonify({
+            "success":     True,
+            "base_fare":   TaxiConfig.BASE_FARE,
+            "city_rate":   TaxiConfig.CITY_RATE,
+            "suburb_rate": TaxiConfig.SUBURB_RATE,
+            "wait_rate":   TaxiConfig.WAIT_RATE
+        }), 200
+    except Exception as e:
+        logging.error(f"Tariffs error: {e}")
+        return jsonify({"success": False}), 500
+
+
+@flask_app.route('/api/tariffs/update', methods=['POST'])
+@admin_required
+def api_update_tariffs():
+    try:
+        data = request.get_json()
+        TaxiConfig.BASE_FARE   = float(data.get('base_fare',   TaxiConfig.BASE_FARE))
+        TaxiConfig.CITY_RATE   = float(data.get('city_rate',   TaxiConfig.CITY_RATE))
+        TaxiConfig.SUBURB_RATE = float(data.get('suburb_rate', TaxiConfig.SUBURB_RATE))
+        TaxiConfig.WAIT_RATE   = float(data.get('wait_rate',   TaxiConfig.WAIT_RATE))
+        add_log("tariff_update", 0, 0,
+            f"Посадка:{TaxiConfig.BASE_FARE} "
+            f"Город:{TaxiConfig.CITY_RATE} "
+            f"Загород:{TaxiConfig.SUBURB_RATE} "
+            f"Ожидание:{TaxiConfig.WAIT_RATE}"
+        )
+        return jsonify({"success": True}), 200
+    except Exception as e:
+        return jsonify({"success": False}), 500
 
 
 # ==================== ЗАПУСК ====================
