@@ -2,100 +2,226 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>Заявки</title>
+    <title>Заявки — TAXI 3042</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { background: #1a1a1a; font-family: Arial, sans-serif; color: #fff; }
+        body { background: #0f0f0f; font-family: Arial, sans-serif; color: #fff; }
+
         .header {
-            background: #2a2a2a;
+            background: #1a1a1a;
             padding: 16px 24px;
             display: flex;
             justify-content: space-between;
             align-items: center;
             border-bottom: 2px solid #FAD201;
+            position: sticky;
+            top: 0;
+            z-index: 100;
         }
-        .header h1 { color: #FAD201; }
-        .nav a { color: #fff; text-decoration: none; margin-left: 20px; }
+        .header h1 { color: #FAD201; font-size: 20px; }
+        .nav a {
+            color: #aaa;
+            text-decoration: none;
+            margin-left: 20px;
+            font-size: 14px;
+            transition: color 0.2s;
+        }
         .nav a:hover { color: #FAD201; }
-        .content { padding: 30px; }
-        .card {
+        .logout { color: #ff4444 !important; }
+
+        .content { padding: 30px; max-width: 1000px; margin: 0 auto; }
+
+        .page-title {
+            font-size: 22px;
+            font-weight: bold;
+            color: #fff;
+            margin-bottom: 24px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .counter {
+            display: inline-block;
             background: #2a2a2a;
+            color: #FAD201;
+            padding: 2px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+        }
+
+        /* КАРТОЧКА ЗАЯВКИ */
+        .request-card {
+            background: #1a1a1a;
+            border: 1px solid #2a2a2a;
             border-radius: 12px;
-            padding: 20px;
+            padding: 24px;
             margin-bottom: 16px;
+            transition: border 0.2s;
+        }
+        .request-card:hover { border-color: #FAD201; }
+
+        .card-header {
             display: flex;
             justify-content: space-between;
-            align-items: center;
+            align-items: flex-start;
+            margin-bottom: 16px;
         }
-        .card-info p { color: #888; font-size: 14px; margin-top: 4px; }
-        .card-info h3 { color: #fff; font-size: 18px; }
-        .card-info .car {
-            color: #FAD201;
-            font-size: 20px;
+
+        .driver-name {
+            font-size: 18px;
             font-weight: bold;
+            color: #eef2f8;
         }
-        .actions { display: flex; gap: 10px; }
+        .driver-car {
+            display: inline-block;
+            background: #2a2a2a;
+            padding: 4px 12px;
+            border-radius: 6px;
+            font-weight: bold;
+            color: #FAD201;
+            letter-spacing: 1px;
+            margin-top: 4px;
+            font-size: 14px;
+        }
+
+        .card-date {
+            color: #555;
+            font-size: 12px;
+        }
+
+        .card-info {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            margin-bottom: 20px;
+        }
+        .info-row {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            font-size: 13px;
+            color: #aaa;
+        }
+        .info-row span { color: #eef2f8; }
+
+        .card-actions {
+            display: flex;
+            gap: 12px;
+        }
+
         .btn-approve {
-            padding: 12px 24px;
+            flex: 1;
+            padding: 12px;
+            background: #1b5e20;
+            color: #4CAF50;
+            border: 1px solid #4CAF50;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+            text-decoration: none;
+            text-align: center;
+            transition: all 0.2s;
+        }
+        .btn-approve:hover {
             background: #4CAF50;
             color: #fff;
-            border: none;
+        }
+
+        .btn-reject {
+            flex: 1;
+            padding: 12px;
+            background: #b71c1c;
+            color: #f44336;
+            border: 1px solid #f44336;
             border-radius: 8px;
+            font-size: 14px;
             font-weight: bold;
             cursor: pointer;
             text-decoration: none;
-            font-size: 15px;
+            text-align: center;
+            transition: all 0.2s;
         }
-        .btn-reject {
-            padding: 12px 24px;
+        .btn-reject:hover {
             background: #f44336;
             color: #fff;
-            border: none;
-            border-radius: 8px;
-            font-weight: bold;
-            cursor: pointer;
-            text-decoration: none;
-            font-size: 15px;
         }
+
         .empty {
             text-align: center;
-            color: #888;
-            padding: 60px;
-            font-size: 18px;
+            padding: 80px;
+            color: #444;
         }
-        .logout { color: #ff4444; text-decoration: none; margin-left: 20px; }
+        .empty .icon { font-size: 48px; margin-bottom: 12px; }
+        .empty p { font-size: 14px; }
     </style>
 </head>
 <body>
-    <div class="header">
-        <h1>🚕 TAXI 3042</h1>
-        <div class="nav">
-            <a href="/">🏠 Главная</a>
-            <a href="/drivers">👥 Водители</a>
-            <a href="/stats">📊 Статистика</a>
-            <a href="/logout" class="logout">Выйти</a>
-        </div>
+
+<div class="header">
+    <h1>🚕 TAXI 3042</h1>
+    <div class="nav">
+        <a href="/">🏠 Главная</a>
+        <a href="/requests">📝 Заявки</a>
+        <a href="/drivers">👥 Водители</a>
+        <a href="/stats">📊 Статистика</a>
+        <a href="/logout" class="logout">🚪 Выйти</a>
     </div>
-    <div class="content">
-        <h2 style="margin-bottom:24px;">📝 Заявки на регистрацию</h2>
-        {% if drivers %}
-            {% for driver in drivers %}
-            <div class="card">
-                <div class="card-info">
-                    <h3>{{ driver.full_name }}</h3>
-                    <div class="car">🚗 {{ driver.car_number }}</div>
-                    <p>📱 {{ driver.phone }}</p>
-                    <p>📅 {{ driver.created_at[:16] }}</p>
+</div>
+
+<div class="content">
+
+    <div class="page-title">
+        📝 Заявки на регистрацию
+        <span class="counter">{{ drivers|length }}</span>
+    </div>
+
+    {% if drivers %}
+        {% for driver in drivers %}
+        <div class="request-card">
+            <div class="card-header">
+                <div>
+                    <div class="driver-name">{{ driver.full_name }}</div>
+                    <div class="driver-car">🚗 {{ driver.car_number }}</div>
                 </div>
-                <div class="actions">
-                    <a href="/approve/{{ driver.tg_id }}" class="btn-approve">✅ Одобрить</a>
-                    <a href="/reject/{{ driver.tg_id }}"  class="btn-reject">❌ Отклонить</a>
+                <div class="card-date">
+                    📅 {{ driver.created_at[:16] }}
                 </div>
             </div>
-            {% endfor %}
-        {% else %}
-            <div class="empty">📭 Нет новых заявок</div>
-        {% endif %}
-    </div>
+
+            <div class="card-info">
+                <div class="info-row">
+                    📱 Телефон: <span>{{ driver.phone or '—' }}</span>
+                </div>
+                <div class="info-row">
+                    👤 Username: <span>{{ driver.username or '—' }}</span>
+                </div>
+            </div>
+
+            <!-- ✅ ИСПРАВЛЕНО: каждая кнопка привязана к своему car_number -->
+            <div class="card-actions">
+                <a href="/approve/{{ driver.car_number }}"
+                   class="btn-approve"
+                   onclick="return confirm('Одобрить водителя {{ driver.full_name }} ({{ driver.car_number }})?')">
+                   ✅ Одобрить
+                </a>
+                <a href="/reject/{{ driver.car_number }}"
+                   class="btn-reject"
+                   onclick="return confirm('Отклонить водителя {{ driver.full_name }} ({{ driver.car_number }})?')">
+                   ❌ Отклонить
+                </a>
+            </div>
+        </div>
+        {% endfor %}
+
+    {% else %}
+        <div class="empty">
+            <div class="icon">📭</div>
+            <p>Новых заявок нет</p>
+        </div>
+    {% endif %}
+
+</div>
+
 </body>
 </html>
