@@ -967,23 +967,29 @@ def api_login():
         if not car_number or not pin:
             return jsonify({"success": False, "error": "Заполните все поля"}), 400
 
-        driver = get_driver_by_car(car_number)
+        # ✅ Ищем водителя по ОБОИМ полям сразу
+        conn = get_db()
+        c = conn.cursor()
+        c.execute(
+            "SELECT * FROM drivers WHERE car_number = ? AND pin = ?",
+            (car_number, pin)
+        )
+        driver = c.fetchone()
+        conn.close()
 
         if not driver:
-            return jsonify({"success": False, "error": "Водитель не найден"}), 404
+            return jsonify({"success": False, "error": "Неверный номер авто или PIN"}), 401
         if driver['is_blocked']:
             return jsonify({"success": False, "error": "Аккаунт заблокирован"}), 403
         if driver['status'] != 'approved':
             return jsonify({"success": False, "error": "Заявка ещё не одобрена"}), 403
-        if driver['pin'] != pin:
-            return jsonify({"success": False, "error": "Неверный PIN код"}), 401
 
+        # ✅ Проверка срока PIN
         if driver['pin_expires_at']:
             expires = datetime.strptime(driver['pin_expires_at'], "%Y-%m-%d %H:%M:%S")
             if datetime.now() > expires:
-                return jsonify({"success": False, "error": "PIN истёк, обратитесь к администратору"}), 403
+                return jsonify({"success": False, "error": "PIN истёк"}), 403
 
-        # ✅ Обновляем статус и последний вход
         update_online_status(car_number, 'online')
 
         return jsonify({
