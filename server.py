@@ -490,6 +490,28 @@ def api_login():
             return jsonify({"success": False,
                             "error": "Заполните все поля"}), 400
 
+      # ✅ Новый endpoint — проверка статуса водителя
+@flask_app.route('/api/driver/check/<car_number>', methods=['GET'])
+def api_check_driver(car_number):
+    try:
+        driver = get_driver_by_car(car_number)
+        if not driver:
+            return jsonify({
+                "success":    False,
+                "is_blocked": True,
+                "status":     "not_found"
+            }), 404
+
+        return jsonify({
+            "success":    True,
+            "is_blocked": bool(driver['is_blocked']),
+            "status":     driver['status']
+        }), 200
+
+    except Exception as e:
+        logging.error(f"Check error: {e}")
+        return jsonify({"success": False, "is_blocked": True}), 500
+
         # ✅ Ищем по car_number И pin одновременно
         conn = get_db()
         c = conn.cursor()
