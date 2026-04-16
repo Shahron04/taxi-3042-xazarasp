@@ -96,6 +96,18 @@ def init_db():
         )
     """)
 
+    # ✅ НОВАЯ ТАБЛИЦА ТРАНЗАКЦИЙ
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS transactions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            car_number TEXT NOT NULL,
+            amount REAL NOT NULL,
+            type TEXT NOT NULL CHECK(type IN ('credit','debit')),
+            description TEXT DEFAULT '',
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
     conn.commit()
     conn.close()
     print("✅ База данных готова")
@@ -327,6 +339,23 @@ def get_stats():
     stats['trips_total'] = c.fetchone()[0]
     c.execute("SELECT COALESCE(SUM(price), 0) FROM trips")
     stats['earnings_total'] = c.fetchone()[0]
+
+    # ✅ НОВОЕ: статистика баланса
+    c.execute("SELECT COALESCE(SUM(balance), 0) FROM drivers WHERE status='approved'")
+    stats['total_balance'] = c.fetchone()[0]
+    c.execute("SELECT COUNT(*) FROM drivers WHERE balance < 10000 AND status='approved'")
+    stats['low_balance_count'] = c.fetchone()[0]
+    c.execute("""
+        SELECT COALESCE(SUM(amount), 0) FROM transactions
+        WHERE type='debit' AND created_at LIKE ?
+    """, (f"{today}%",))
+    stats['deducted_today'] = c.fetchone()[0]
+    c.execute("""
+        SELECT COALESCE(SUM(amount), 0) FROM transactions
+        WHERE type='credit' AND created_at LIKE ?
+    """, (f"{today}%",))
+    stats['topup_today'] = c.fetchone()[0]
+
     conn.close()
     return stats
 
@@ -337,6 +366,97 @@ def get_logs():
     logs = c.fetchall()
     conn.close()
     return logs
+
+# ==================== НОВЫЕ ФУНКЦИИ БАЛАНСА ====================
+
+def topup_driver_balance(car_number, amount, description="Пополнение баланса"):
+    """Пополнить баланс водителя"""
+    conn = get_db()
+    c = conn.cursor()
+    # Обновить баланс
+    c.execute("""
+        UPDATE drivers SET balance = balance + ?
+        WHERE car_number = ?
+    """, (amount, car_number.upper()))
+    # Записать транзакцию
+    c.execute("""
+        INSERT INTO transactions (car_number, amount, type, description)
+        VALUES (?, ?, 'credit', ?)
+    """, (car_number.upper(), amount, description))
+    # Получить новый баланс
+    c.execute("SELECT balance FROM drivers WHERE car_number = ?",
+              (car_number.upper(),))
+    row = c.fetchone()
+    new_balance = row['balance'] if row else 0.0
+    conn.commit()
+    conn.close()
+    return new_balance
+
+def deduct_driver_balance(car_number, amount, description="Списание"):
+    """Списать с баланса водителя"""
+    conn = get_db()
+    c = conn.cursor()
+    # Проверить текущий баланс
+    c.execute("SELECT balance FROM drivers WHERE car_number = ?",
+              (car_number.upper(),))
+    row = c.fetchone()
+    if not row:
+        conn.close()
+        return False, "Водитель не найден", 0.0
+    current = row['balance']
+    if current < amount:
+        conn.close()
+        return False, "Недостаточно средств", current
+    # Списать
+    c.execute("""
+        UPDATE drivers SET balance = balance - ?
+        WHERE car_number = ?
+    """, (amount, car_number.upper()))
+    # Записать транзакцию
+    c.execute("""
+        INSERT INTO transactions (car_number, amount, type, description)
+        VALUES (?, ?, 'debit', ?)
+    """, (car_number.upper(), amount, description))
+    c.execute("SELECT balance FROM drivers WHERE car_number = ?",
+              (car_number.upper(),))
+    new_balance = c.fetchone()['balance']
+    conn.commit()
+    conn.close()
+    return True, "OK", new_balance
+
+def get_driver_transactions(car_number, limit=50):
+    """История транзакций водителя"""
+    conn = get_db()
+    c = conn.cursor()
+    c.execute("""
+        SELECT * FROM transactions
+        WHERE car_number = ?
+        ORDER BY created_at DESC
+        LIMIT ?
+    """, (car_number.upper(), limit))
+    txs = c.fetchall()
+    conn.close()
+    return txs
+
+def get_all_drivers_balance():
+    """Все водители с балансами для дашборда"""
+    conn = get_db()
+    c = conn.cursor()
+    c.execute("""
+        SELECT d.*,
+               COUNT(t.id) as trip_count,
+               COALESCE(SUM(CASE WHEN tx.type='debit' THEN tx.amount ELSE 0 END),0) as total_spent,
+               COALESCE(SUM(CASE WHEN tx.type='credit' THEN tx.amount ELSE 0 END),0) as total_topup
+        FROM drivers d
+        LEFT JOIN trips t ON t.car_number = d.car_number
+        LEFT JOIN transactions tx ON tx.car_number = d.car_number
+        WHERE d.status = 'approved'
+        GROUP BY d.id
+        ORDER BY d.full_name
+    """)
+    drivers = c.fetchall()
+    conn.close()
+    return drivers
 
 # ==================== FLASK ====================
 flask_app = Flask(__name__, template_folder='.')
@@ -423,16 +543,13 @@ def web_reset_pin(car_number):
 def stats():
     return render_template('stats.html', stats=get_stats(), logs=get_logs())
 
-# ✅ Поездки с фильтрацией
 @flask_app.route('/trips')
 @admin_required
 def trips_page():
     car  = request.args.get('car',  '').strip().upper()
     date = request.args.get('date', '').strip()
-
     conn = get_db()
     c    = conn.cursor()
-
     if car and date:
         c.execute("""
             SELECT * FROM trips
@@ -453,7 +570,6 @@ def trips_page():
         """, (f"{date}%",))
     else:
         c.execute("SELECT * FROM trips ORDER BY created_at DESC LIMIT 200")
-
     trips = c.fetchall()
     conn.close()
     return render_template('trips.html', trips=trips)
@@ -462,6 +578,61 @@ def trips_page():
 @admin_required
 def broadcast():
     return render_template('broadcast.html')
+
+# ✅ НОВЫЙ РОУТ - СТРАНИЦА БАЛАНСА
+@flask_app.route('/balance')
+@admin_required
+def balance_page():
+    drivers_list = get_all_drivers_balance()
+    stats        = get_stats()
+    return render_template('balance.html',
+                           drivers=drivers_list,
+                           stats=stats)
+
+# ✅ НОВЫЙ РОУТ - Пополнение через веб-форму
+@flask_app.route('/balance/topup', methods=['POST'])
+@admin_required
+def web_topup():
+    car_number  = request.form.get('car_number', '').strip().upper()
+    amount      = float(request.form.get('amount', 0))
+    description = request.form.get('description', 'Пополнение баланса').strip()
+
+    if not car_number or amount <= 0:
+        return redirect(url_for('balance_page'))
+
+    new_balance = topup_driver_balance(car_number, amount, description)
+    add_log("topup", 0, 0,
+            f"Авто: {car_number} | Сумма: {amount:,.0f} сум | "
+            f"Баланс: {new_balance:,.0f} сум")
+    return redirect(url_for('balance_page'))
+
+# ✅ НОВЫЙ РОУТ - Списание через веб-форму
+@flask_app.route('/balance/deduct', methods=['POST'])
+@admin_required
+def web_deduct():
+    car_number  = request.form.get('car_number', '').strip().upper()
+    amount      = float(request.form.get('amount', 0))
+    description = request.form.get('description', 'Списание').strip()
+
+    if not car_number or amount <= 0:
+        return redirect(url_for('balance_page'))
+
+    ok, msg, new_balance = deduct_driver_balance(car_number, amount, description)
+    if ok:
+        add_log("deduct", 0, 0,
+                f"Авто: {car_number} | Списано: {amount:,.0f} сум | "
+                f"Баланс: {new_balance:,.0f} сум")
+    return redirect(url_for('balance_page'))
+
+# ✅ НОВЫЙ РОУТ - История транзакций (страница)
+@flask_app.route('/balance/history/<car_number>')
+@admin_required
+def balance_history(car_number):
+    driver = get_driver_by_car(car_number)
+    txs    = get_driver_transactions(car_number, limit=100)
+    return render_template('balance_history.html',
+                           driver=driver,
+                           transactions=txs)
 
 # ==================== API для APK ====================
 
@@ -611,6 +782,107 @@ def api_get_balance():
 
     except Exception as e:
         logging.error(f"Balance error: {e}")
+        return jsonify({"success": False, "error": "Ошибка сервера"}), 500
+
+
+# ✅ НОВЫЙ API - Получить баланс + транзакции для APK
+@flask_app.route('/api/driver/balance/detail', methods=['POST'])
+def api_balance_detail():
+    try:
+        data       = request.get_json()
+        car_number = data.get('car_number', '').strip().upper()
+
+        driver = get_driver_by_car(car_number)
+        if not driver:
+            return jsonify({"success": False, "error": "Водитель не найден"}), 404
+
+        txs = get_driver_transactions(car_number, limit=50)
+
+        tx_list = []
+        for tx in txs:
+            tx_list.append({
+                "id":          tx['id'],
+                "amount":      tx['amount'],
+                "type":        tx['type'],
+                "description": tx['description'],
+                "date":        tx['created_at']
+            })
+
+        return jsonify({
+            "success":       True,
+            "balance":       driver['balance'] or 0.0,
+            "car_number":    driver['car_number'],
+            "name":          driver['full_name'],
+            "transactions":  tx_list
+        }), 200
+
+    except Exception as e:
+        logging.error(f"Balance detail error: {e}")
+        return jsonify({"success": False, "error": "Ошибка сервера"}), 500
+
+
+# ✅ НОВЫЙ API - Пополнение баланса (для админа через API)
+@flask_app.route('/api/admin/balance/topup', methods=['POST'])
+def api_admin_topup():
+    try:
+        # Простая защита через заголовок
+        auth = request.headers.get('X-Admin-Key', '')
+        if auth != SECRET_KEY:
+            return jsonify({"success": False, "error": "Не авторизован"}), 401
+
+        data        = request.get_json()
+        car_number  = data.get('car_number', '').strip().upper()
+        amount      = float(data.get('amount', 0))
+        description = data.get('description', 'Пополнение').strip()
+
+        if not car_number or amount <= 0:
+            return jsonify({"success": False, "error": "Неверные данные"}), 400
+
+        new_balance = topup_driver_balance(car_number, amount, description)
+        add_log("api_topup", 0, 0,
+                f"Авто: {car_number} | +{amount:,.0f} сум")
+
+        return jsonify({
+            "success":     True,
+            "new_balance": new_balance
+        }), 200
+
+    except Exception as e:
+        logging.error(f"API topup error: {e}")
+        return jsonify({"success": False, "error": "Ошибка сервера"}), 500
+
+
+# ✅ НОВЫЙ API - Списание баланса (для APK автоматически)
+@flask_app.route('/api/admin/balance/deduct', methods=['POST'])
+def api_admin_deduct():
+    try:
+        auth = request.headers.get('X-Admin-Key', '')
+        if auth != SECRET_KEY:
+            return jsonify({"success": False, "error": "Не авторизован"}), 401
+
+        data        = request.get_json()
+        car_number  = data.get('car_number', '').strip().upper()
+        amount      = float(data.get('amount', 0))
+        description = data.get('description', 'Списание').strip()
+
+        if not car_number or amount <= 0:
+            return jsonify({"success": False, "error": "Неверные данные"}), 400
+
+        ok, msg, new_balance = deduct_driver_balance(car_number, amount, description)
+
+        if not ok:
+            return jsonify({"success": False, "error": msg}), 400
+
+        add_log("api_deduct", 0, 0,
+                f"Авто: {car_number} | -{amount:,.0f} сум")
+
+        return jsonify({
+            "success":     True,
+            "new_balance": new_balance
+        }), 200
+
+    except Exception as e:
+        logging.error(f"API deduct error: {e}")
         return jsonify({"success": False, "error": "Ошибка сервера"}), 500
 
 
