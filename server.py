@@ -517,6 +517,15 @@ def web_reject(car_number):
     add_log("reject", 0, 0, f"Авто: {car_number}")
     return redirect(url_for('requests_page'))
 
+# ✅ ДОБАВЬ ЭТО ПОСЛЕ
+@flask_app.route('/approve_direct/<car_number>')
+@admin_required
+def web_approve_direct(car_number):
+    """Одобрить водителя напрямую из списка водителей"""
+    pin = approve_driver_by_car(car_number)
+    add_log("approve", 0, 0, f"Авто: {car_number} PIN: {pin}")
+    return redirect(url_for('drivers'))
+
 @flask_app.route('/block/<car_number>')
 @admin_required
 def web_block(car_number):
