@@ -140,9 +140,9 @@
         .btn-unblock { background: #1b5e20; color: #4CAF50; border: 1px solid #4CAF50; }
         .btn-reset   { background: #e65100; color: #fff; }
         .btn-history { background: #1a3a5c; color: #60a5fa; border: 1px solid #60a5fa; }
-
-        /* ✅ НОВАЯ КНОПКА БАЛАНС */
         .btn-balance { background: #1a2e1a; color: #FAD201; border: 1px solid #FAD201; }
+        /* ✅ НОВАЯ КНОПКА ОДОБРИТЬ */
+        .btn-approve { background: #1b5e20; color: #4CAF50; border: 1px solid #4CAF50; }
 
         .balance { color: #22c97a; font-weight: bold; }
         .balance.zero { color: #444; }
@@ -168,7 +168,7 @@
         }
         .empty .icon { font-size: 48px; margin-bottom: 12px; }
 
-        /* ✅ МОДАЛ ПОПОЛНЕНИЯ */
+        /* ✅ МОДАЛ */
         .modal-overlay {
             display: none;
             position: fixed;
@@ -248,9 +248,9 @@
             font-weight: bold;
             cursor: pointer;
         }
-        .btn-cancel { background: #222; color: #aaa; }
+        .btn-cancel       { background: #222; color: #aaa; }
         .btn-confirm-green { background: #FAD201; color: #000; }
-        .btn-confirm-red { background: #b71c1c; color: #fff; }
+        .btn-confirm-red  { background: #b71c1c; color: #fff; }
     </style>
 </head>
 <body>
@@ -411,7 +411,7 @@
                        🚕 История
                     </a>
 
-                    <!-- ✅ КНОПКА БАЛАНС -->
+                    <!-- Баланс -->
                     <button
                         class="btn btn-balance"
                         onclick="openBalanceModal(
@@ -422,12 +422,23 @@
                         💰 Баланс
                     </button>
 
-                    <!-- Сброс PIN -->
-                    <a href="/reset_pin/{{ driver.car_number }}"
-                       class="btn btn-reset"
-                       onclick="return confirm('Сбросить PIN для {{ driver.car_number }}?')">
-                       🔄 PIN
-                    </a>
+                    <!-- ✅ ОДОБРИТЬ - если отклонён или ожидает -->
+                    {% if driver.status == 'rejected' or driver.status == 'pending' %}
+                        <a href="/approve_direct/{{ driver.car_number }}"
+                           class="btn btn-approve"
+                           onclick="return confirm('Одобрить {{ driver.car_number }}?')">
+                           ✅ Одобрить
+                        </a>
+                    {% endif %}
+
+                    <!-- Сброс PIN - только для одобренных -->
+                    {% if driver.status == 'approved' and not driver.is_blocked %}
+                        <a href="/reset_pin/{{ driver.car_number }}"
+                           class="btn btn-reset"
+                           onclick="return confirm('Сбросить PIN для {{ driver.car_number }}?')">
+                           🔄 PIN
+                        </a>
+                    {% endif %}
 
                     <!-- Блок/Разблок -->
                     {% if driver.is_blocked %}
@@ -436,7 +447,7 @@
                            onclick="return confirm('Разблокировать {{ driver.car_number }}?')">
                            ✅ Разблок
                         </a>
-                    {% else %}
+                    {% elif driver.status == 'approved' %}
                         <a href="/block/{{ driver.car_number }}"
                            class="btn btn-block"
                            onclick="return confirm('Заблокировать {{ driver.car_number }}?')">
@@ -469,17 +480,14 @@
 
         <input type="hidden" id="modal-car">
 
-        <!-- Водитель -->
         <label>Водитель</label>
         <input type="text" id="modal-name" disabled
                style="color:#aaa; cursor:default;">
 
-        <!-- Текущий баланс -->
         <label>Текущий баланс</label>
         <input type="text" id="modal-current-balance" disabled
                style="color:#22c97a; font-weight:bold; cursor:default;">
 
-        <!-- Переключатель: Пополнить / Списать -->
         <label>Операция</label>
         <div style="display:flex; gap:8px; margin-top:4px;">
             <button id="tab-topup" onclick="setTab('topup')"
@@ -497,7 +505,6 @@
             </button>
         </div>
 
-        <!-- Сумма -->
         <label>Сумма (сум)</label>
         <input type="number" id="modal-amount"
                placeholder="Введите сумму" min="1">
@@ -509,13 +516,11 @@
             <button class="qa-btn" onclick="setAmt(200000)">200 000</button>
         </div>
 
-        <!-- Описание -->
         <label>Описание</label>
         <input type="text" id="modal-description"
                placeholder="Причина операции"
                value="Пополнение баланса">
 
-        <!-- Кнопки -->
         <div class="modal-footer">
             <button class="btn-cancel" onclick="closeModal()">Отмена</button>
             <button id="modal-confirm-btn"
@@ -530,7 +535,6 @@
 <script>
     let currentTab = 'topup';
 
-    // ===== ОТКРЫТЬ МОДАЛ =====
     function openBalanceModal(car, name, balance) {
         document.getElementById('modal-car').value = car;
         document.getElementById('modal-name').value = name + ' (' + car + ')';
@@ -542,36 +546,29 @@
         document.getElementById('balance-modal').classList.add('open');
     }
 
-    // ===== ЗАКРЫТЬ =====
     function closeModal() {
         document.getElementById('balance-modal').classList.remove('open');
     }
 
-    // Закрыть по клику вне модала
     document.getElementById('balance-modal').addEventListener('click', function(e) {
         if (e.target === this) closeModal();
     });
 
-    // ===== ПЕРЕКЛЮЧАТЕЛЬ ПОПОЛНИТЬ/СПИСАТЬ =====
     function setTab(tab) {
         currentTab = tab;
-        const btnTopup  = document.getElementById('tab-topup');
-        const btnDeduct = document.getElementById('tab-deduct');
+        const btnTopup   = document.getElementById('tab-topup');
+        const btnDeduct  = document.getElementById('tab-deduct');
         const btnConfirm = document.getElementById('modal-confirm-btn');
 
         if (tab === 'topup') {
-            // Активная кнопка
             btnTopup.style.background  = '#FAD201';
             btnTopup.style.color       = '#000';
             btnTopup.style.border      = 'none';
-            // Неактивная
             btnDeduct.style.background = '#111';
             btnDeduct.style.color      = '#aaa';
             btnDeduct.style.border     = '1px solid #333';
-            // Кнопка подтверждения
             btnConfirm.textContent     = '✅ Пополнить';
             btnConfirm.className       = 'btn-confirm-green';
-            // Описание
             document.getElementById('modal-description').value = 'Пополнение баланса';
         } else {
             btnDeduct.style.background = '#b71c1c';
@@ -586,12 +583,10 @@
         }
     }
 
-    // ===== БЫСТРЫЕ СУММЫ =====
     function setAmt(val) {
         document.getElementById('modal-amount').value = val;
     }
 
-    // ===== ОТПРАВИТЬ =====
     async function submitBalance() {
         const car    = document.getElementById('modal-car').value;
         const amount = parseFloat(document.getElementById('modal-amount').value);
@@ -619,7 +614,6 @@
 
             if (res.ok || res.redirected) {
                 closeModal();
-                // Обновляем страницу чтобы показать новый баланс
                 location.reload();
             } else {
                 alert('❌ Ошибка операции');
