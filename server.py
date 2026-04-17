@@ -3,6 +3,7 @@ import sqlite3
 import secrets
 from datetime import datetime, timedelta
 from functools import wraps
+from zoneinfo import ZoneInfo        # ← НОВЫЙ ИМПОРТ
 
 from flask import (Flask, render_template, request,
                    redirect, url_for, session, jsonify)
@@ -906,6 +907,9 @@ def api_save_trip():
         waiting_seconds = data.get('waiting_seconds', 0)
         total_seconds   = data.get('total_seconds', 0)
 
+        # ✅ Время по Ташкенту (UTC+5)
+        tashkent_time = datetime.now(ZoneInfo("Asia/Tashkent")).strftime("%Y-%m-%d %H:%M:%S")
+
         conn = get_db()
         c    = conn.cursor()
         c.execute("""
@@ -914,9 +918,13 @@ def api_save_trip():
              waiting_seconds, total_seconds, created_at)
             VALUES (?, ?, ?, ?, ?, ?, ?)
         """, (
-            car_number, price, city_distance, suburb_distance,
-            waiting_seconds, total_seconds,
-            datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            car_number, 
+            price, 
+            city_distance, 
+            suburb_distance,
+            waiting_seconds, 
+            total_seconds,
+            tashkent_time                    # ← Исправлено
         ))
         conn.commit()
         conn.close()
@@ -924,9 +932,11 @@ def api_save_trip():
         add_log("trip", 0, 0,
             f"Авто: {car_number} | "
             f"Цена: {price:,} сум | "
-            f"Км: {city_distance:.1f}+{suburb_distance:.1f}"
+            f"Км: {city_distance:.1f}+{suburb_distance:.1f} | "
+            f"Время: {tashkent_time}"
         )
-        return jsonify({"success": True}), 200
+        
+        return jsonify({"success": True, "created_at": tashkent_time}), 200
 
     except Exception as e:
         logging.error(f"Trip error: {e}")
