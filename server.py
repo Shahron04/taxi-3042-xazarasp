@@ -894,7 +894,33 @@ def api_admin_deduct():
     except Exception as e:
         logging.error(f"API deduct error: {e}")
         return jsonify({"success": False, "error": "Ошибка сервера"}), 500
+        
+@flask_app.route('/api/driver/update', methods=['POST'])
+def api_update_driver():
+    try:
+        data        = request.get_json()
+        car_number  = data.get('car_number', '').strip().upper()
+        name        = data.get('name', '').strip()
+        phone       = data.get('phone', '').strip()
 
+        if not car_number or not name or not phone:
+            return jsonify({"success": False, "error": "Не все поля заполнены"}), 400
+
+        conn = get_db()
+        c = conn.cursor()
+        c.execute("""
+            UPDATE drivers
+            SET full_name = ?, phone = ?
+            WHERE car_number = ?
+        """, (name, phone, car_number))
+        conn.commit()
+        conn.close()
+
+        return jsonify({"success": True}), 200
+
+    except Exception as e:
+        logging.error(f"Update driver error: {e}")
+        return jsonify({"success": False, "error": "Ошибка сервера"}), 500
 
 @flask_app.route('/api/driver/trip', methods=['POST'])
 def api_save_trip():
