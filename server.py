@@ -947,13 +947,27 @@ def api_save_trip():
 def api_get_driver_trips(car_number):
     try:
         conn = get_db()
-        c = conn.cursor()
-        c.execute("""
-            SELECT * FROM trips
-            WHERE car_number = ?
-            ORDER BY created_at DESC
-            LIMIT 100
-        """, (car_number.upper(),))
+        c    = conn.cursor()
+
+        # ✅ Получаем параметры дат
+        date_from = request.args.get('date_from', '')
+        date_to   = request.args.get('date_to',   '')
+
+        # ✅ Формируем запрос с фильтром
+        query  = "SELECT * FROM trips WHERE car_number = ?"
+        params = [car_number.upper()]
+
+        if date_from:
+            query += " AND DATE(created_at) >= DATE(?)"
+            params.append(date_from)
+
+        if date_to:
+            query += " AND DATE(created_at) <= DATE(?)"
+            params.append(date_to)
+
+        query += " ORDER BY created_at DESC LIMIT 500"
+
+        c.execute(query, params)
         trips = c.fetchall()
         conn.close()
 
