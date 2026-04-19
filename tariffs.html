@@ -2,218 +2,312 @@
 
 {% block title %}Тарифы{% endblock %}
 
-{% block styles %}
-{{ super() }}
-<style>
-    /* Стили из первого фрагмента, адаптированные под тёмную тему */
-    * { margin:0; padding:0; box-sizing:border-box; }
-    body { background:#0f0f0f; color:#fff; font-family:Arial; }
-
-    .content { padding:30px; max-width:1200px; margin:0 auto; }
-    .page-title { font-size:22px; font-weight:bold; margin-bottom:20px; }
-
-    /* КАРТОЧКИ ТАРИФОВ */
-    .tariffs-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(320px, 1fr)); gap:20px; margin-bottom:30px; }
-
-    .tariff-card { background:#1a1a1a; border:1px solid #2a2a2a; border-radius:12px; padding:20px; }
-    .tariff-card.standard { border-color:#FAD201; }
-
-    .tariff-name { font-size:18px; font-weight:bold; color:#FAD201; margin-bottom:16px; display:flex; justify-content:space-between; align-items:center; }
-
-    .tariff-row { display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid #222; }
-    .tariff-row:last-child { border-bottom:none; }
-    .tariff-label { color:#888; font-size:13px; }
-    .tariff-value { color:#fff; font-weight:bold; font-size:13px; }
-
-    .tariff-actions { display:flex; gap:8px; margin-top:16px; }
-
-    .btn { padding:8px 14px; border:none; border-radius:8px; cursor:pointer; font-size:13px; font-weight:bold; }
-    .btn-yellow { background:#FAD201; color:#000; }
-    .btn-red { background:#b71c1c; color:#fff; }
-
-    /* ФОРМА ДОБАВЛЕНИЯ */
-    .add-form { background:#1a1a1a; border:1px solid #2a2a2a; border-radius:12px; padding:24px; }
-    .add-form h3 { color:#FAD201; font-size:18px; margin-bottom:20px; }
-
-    .form-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(200px, 1fr)); gap:16px; }
-
-    .form-group { display:flex; flex-direction:column; gap:6px; }
-    .form-group label { font-size:12px; color:#888; }
-    .form-group input { padding:10px 14px; background:#0f0f0f; border:1px solid #333; border-radius:8px; color:#fff; font-size:14px; outline:none; }
-    .form-group input:focus { border-color:#FAD201; }
-
-    .form-footer { margin-top:16px; }
-
-    /* МОДАЛ РЕДАКТИРОВАНИЯ */
-    .modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.7); z-index:999; align-items:center; justify-content:center; }
-    .modal-overlay.open { display:flex; }
-    .modal { background:#1a1a1a; border:1px solid #333; border-radius:16px; padding:28px; width:420px; max-width:95vw; }
-    .modal-title { font-size:18px; font-weight:bold; margin-bottom:20px; color:#FAD201; }
-    .modal label { display:block; font-size:12px; color:#888; margin-bottom:6px; margin-top:14px; }
-    .modal input { width:100%; padding:10px 14px; background:#0f0f0f; border:1px solid #333; border-radius:8px; color:#fff; font-size:14px; outline:none; }
-    .modal input:focus { border-color:#FAD201; }
-    .modal-footer { display:flex; gap:10px; margin-top:22px; }
-    .modal-footer button { flex:1; padding:11px; border:none; border-radius:8px; font-size:14px; font-weight:bold; cursor:pointer; }
-    .btn-cancel { background:#222; color:#aaa; }
-    .btn-save { background:#FAD201; color:#000; }
-
-    .badge-standard { background:#FAD201; color:#000; padding:2px 8px; border-radius:6px; font-size:11px; }
-</style>
-{% endblock %}
-
 {% block content %}
-<div class="content">
-    <div class="page-title">⚙ Управление тарифами</div>
+<div style="padding: 30px;">
 
-    <!-- СПИСОК ТАРИФОВ (карточки) -->
-    <div class="tariffs-grid">
-        {% for t in tariffs %}
-        <div class="tariff-card {% if t.id == 1 %}standard{% endif %}">
-            <div class="tariff-name">
-                {{ t.name }}
-                {% if t.id == 1 %}
-                <span class="badge-standard">Стандарт</span>
-                {% endif %}
-            </div>
-
-            <div class="tariff-row">
-                <span class="tariff-label">🏙 Город (за км)</span>
-                <span class="tariff-value">{{ "{:,.0f}".format(t.city_rate) }} сум</span>
-            </div>
-            <div class="tariff-row">
-                <span class="tariff-label">🛣 За городом (за км)</span>
-                <span class="tariff-value">{{ "{:,.0f}".format(t.suburb_rate) }} сум</span>
-            </div>
-            <div class="tariff-row">
-                <span class="tariff-label">🚕 Посадка</span>
-                <span class="tariff-value">{{ "{:,.0f}".format(t.base_fare) }} сум</span>
-            </div>
-            <div class="tariff-row">
-                <span class="tariff-label">⏱ Ожидание (за мин)</span>
-                <span class="tariff-value">{{ "{:,.0f}".format(t.wait_rate) }} сум</span>
-            </div>
-
-            <div class="tariff-actions">
-                <button class="btn btn-yellow"
-                    onclick="openEdit(
-                        {{ t.id }},
-                        '{{ t.name }}',
-                        {{ t.city_rate }},
-                        {{ t.suburb_rate }},
-                        {{ t.base_fare }},
-                        {{ t.wait_rate }}
-                    )">
-                    ✏ Изменить
-                </button>
-                {% if t.id != 1 %}
-                <a href="{{ url_for('delete_tariff', tariff_id=t.id) }}"
-                   class="btn btn-red"
-                   onclick="return confirm('Удалить тариф {{ t.name }}?')">
-                    🗑 Удалить
-                </a>
-                {% endif %}
-            </div>
-        </div>
-        {% endfor %}
+    <!-- ЗАГОЛОВОК -->
+    <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 25px;">
+        <h2 style="color: #FFD700; margin: 0;">⚙️ Тарифы</h2>
+        <span style="background: #FFD700; color: #000; border-radius: 50%; 
+                     width: 28px; height: 28px; display: flex; align-items: center; 
+                     justify-content: center; font-weight: bold; font-size: 14px;">
+            {{ tariffs|length }}
+        </span>
     </div>
 
-    <!-- ДОБАВИТЬ ТАРИФ (форма) -->
-    <div class="add-form">
-        <h3>➕ Добавить новый тариф</h3>
-        <form method="POST" action="{{ url_for('add_tariff') }}">
-            <div class="form-grid">
-                <div class="form-group">
-                    <label>Название тарифа</label>
-                    <input type="text" name="name"
-                           placeholder="Например: VIP"
-                           required>
-                </div>
-                <div class="form-group">
-                    <label>🏙 Город (сум/км)</label>
-                    <input type="number" name="city_rate"
-                           value="2800" required>
-                </div>
-                <div class="form-group">
-                    <label>🛣 За городом (сум/км)</label>
-                    <input type="number" name="suburb_rate"
-                           value="3000" required>
-                </div>
-                <div class="form-group">
-                    <label>🚕 Посадка (сум)</label>
-                    <input type="number" name="base_fare"
-                           value="5000" required>
-                </div>
-                <div class="form-group">
-                    <label>⏱ Ожидание (сум/мин)</label>
-                    <input type="number" name="wait_rate"
-                           value="500" required>
-                </div>
-            </div>
-            <div class="form-footer">
-                <button type="submit" class="btn btn-yellow">
-                    ➕ Создать тариф
-                </button>
-            </div>
-        </form>
+    <!-- КНОПКА ДОБАВИТЬ -->
+    <div style="margin-bottom: 20px;">
+        <button onclick="openAddModal()"
+            style="background: #28a745; color: #fff; border: none; 
+                   padding: 10px 20px; border-radius: 8px; 
+                   font-size: 14px; font-weight: bold; cursor: pointer;">
+            ➕ Добавить тариф
+        </button>
+    </div>
+
+    <!-- ТАБЛИЦА -->
+    <div style="background: #1a1a1a; border-radius: 12px; overflow: hidden;">
+        <table style="width: 100%; border-collapse: collapse;">
+            <thead>
+                <tr style="border-bottom: 2px solid #333;">
+                    <th style="padding: 15px; color: #888; font-size: 12px; text-align: left;">#</th>
+                    <th style="padding: 15px; color: #888; font-size: 12px; text-align: left;">НАЗВАНИЕ</th>
+                    <th style="padding: 15px; color: #888; font-size: 12px; text-align: center;">🏙️ ГОРОД<br><span style="font-size:10px;">(сум/км)</span></th>
+                    <th style="padding: 15px; color: #888; font-size: 12px; text-align: center;">🌄 ПРИГОРОД<br><span style="font-size:10px;">(сум/км)</span></th>
+                    <th style="padding: 15px; color: #888; font-size: 12px; text-align: center;">🚖 МИН. ТАРИФ<br><span style="font-size:10px;">(сум)</span></th>
+                    <th style="padding: 15px; color: #888; font-size: 12px; text-align: center;">⏱️ ОЖИДАНИЕ<br><span style="font-size:10px;">(сум/мин)</span></th>
+                    <th style="padding: 15px; color: #888; font-size: 12px; text-align: center;">ДЕЙСТВИЯ</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% if tariffs %}
+                    {% for t in tariffs %}
+                    <tr style="border-bottom: 1px solid #2a2a2a; transition: background 0.2s;"
+                        onmouseover="this.style.background='#222'"
+                        onmouseout="this.style.background='transparent'">
+
+                        <td style="padding: 15px; color: #666; font-size: 14px;">
+                            {{ loop.index }}
+                        </td>
+
+                        <td style="padding: 15px;">
+                            <strong style="color: #fff; font-size: 15px;">{{ t.name }}</strong>
+                            {% if t.id == 1 %}
+                            <span style="background: #0d6efd; color: #fff; 
+                                         font-size: 10px; padding: 2px 8px; 
+                                         border-radius: 10px; margin-left: 8px;">
+                                Основной
+                            </span>
+                            {% endif %}
+                        </td>
+
+                        <td style="padding: 15px; text-align: center;">
+                            <strong style="color: #FFD700; font-size: 15px;">
+                                {{ "{:,.0f}".format(t.city_rate) }}
+                            </strong>
+                        </td>
+
+                        <td style="padding: 15px; text-align: center;">
+                            <strong style="color: #FFD700; font-size: 15px;">
+                                {{ "{:,.0f}".format(t.suburb_rate) }}
+                            </strong>
+                        </td>
+
+                        <td style="padding: 15px; text-align: center;">
+                            <strong style="color: #4CAF50; font-size: 15px;">
+                                {{ "{:,.0f}".format(t.base_fare) }}
+                            </strong>
+                        </td>
+
+                        <td style="padding: 15px; text-align: center;">
+                            <strong style="color: #17a2b8; font-size: 15px;">
+                                {{ "{:,.0f}".format(t.wait_rate) }}
+                            </strong>
+                        </td>
+
+                        <td style="padding: 15px; text-align: center;">
+                            <div style="display: flex; gap: 8px; justify-content: center;">
+                                <!-- КНОПКА РЕДАКТИРОВАТЬ -->
+                                <button 
+                                    onclick="openEditModal({{ t.id }}, '{{ t.name }}', {{ t.city_rate }}, {{ t.suburb_rate }}, {{ t.base_fare }}, {{ t.wait_rate }})"
+                                    style="background: #FFD700; color: #000; border: none;
+                                           padding: 7px 14px; border-radius: 6px;
+                                           font-size: 13px; font-weight: bold; cursor: pointer;">
+                                    ✏️ Изменить
+                                </button>
+
+                                <!-- КНОПКА УДАЛИТЬ (не для ID=1) -->
+                                {% if t.id != 1 %}
+                                <a href="{{ url_for('delete_tariff', tariff_id=t.id) }}"
+                                   onclick="return confirm('Удалить тариф «{{ t.name }}»?')"
+                                   style="background: #dc3545; color: #fff; border: none;
+                                          padding: 7px 14px; border-radius: 6px;
+                                          font-size: 13px; font-weight: bold; 
+                                          text-decoration: none; cursor: pointer;">
+                                    🗑️ Удалить
+                                </a>
+                                {% else %}
+                                <button disabled
+                                    style="background: #444; color: #666; border: none;
+                                           padding: 7px 14px; border-radius: 6px;
+                                           font-size: 13px; cursor: not-allowed;">
+                                    🔒
+                                </button>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                {% else %}
+                <tr>
+                    <td colspan="7" style="padding: 40px; text-align: center; color: #555;">
+                        <div style="font-size: 40px; margin-bottom: 10px;">📭</div>
+                        Тарифы не найдены
+                    </td>
+                </tr>
+                {% endif %}
+            </tbody>
+        </table>
     </div>
 </div>
 
-<!-- МОДАЛ РЕДАКТИРОВАНИЯ (overlay) -->
-<div class="modal-overlay" id="edit-modal">
-    <div class="modal">
-        <div class="modal-title">✏ Редактировать тариф</div>
-        <form method="POST" action="{{ url_for('edit_tariff') }}">
-            <input type="hidden" name="tariff_id" id="edit-id">
+<!-- ════════════════════════════════════════════════════════════ -->
+<!-- МОДАЛКА: ДОБАВИТЬ ТАРИФ -->
+<!-- ════════════════════════════════════════════════════════════ -->
+<div id="addModal" style="display:none; position:fixed; top:0; left:0; 
+     width:100%; height:100%; background:rgba(0,0,0,0.7); 
+     z-index:9999; align-items:center; justify-content:center;">
+    <div style="background:#1a1a1a; border-radius:12px; padding:30px; 
+                width:480px; max-width:90%; border: 1px solid #333;">
 
-            <label>Название</label>
-            <input type="text" name="name" id="edit-name" required>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+            <h3 style="color:#28a745; margin:0;">➕ Добавить тариф</h3>
+            <button onclick="closeAddModal()"
+                style="background:none; border:none; color:#fff; font-size:22px; cursor:pointer;">✕</button>
+        </div>
 
-            <label>🏙 Город (сум/км)</label>
-            <input type="number" name="city_rate" id="edit-city" required>
+        <form method="POST" action="{{ url_for('add_tariff') }}">
+            <div style="margin-bottom:15px;">
+                <label style="color:#aaa; font-size:13px; display:block; margin-bottom:6px;">Название</label>
+                <input type="text" name="name" required placeholder="Ночной тариф"
+                    style="width:100%; padding:10px; background:#2a2a2a; border:1px solid #444;
+                           border-radius:8px; color:#fff; font-size:14px; box-sizing:border-box;">
+            </div>
 
-            <label>🛣 За городом (сум/км)</label>
-            <input type="number" name="suburb_rate" id="edit-suburb" required>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:15px; margin-bottom:15px;">
+                <div>
+                    <label style="color:#aaa; font-size:13px; display:block; margin-bottom:6px;">🏙️ Город (сум/км)</label>
+                    <input type="number" name="city_rate" value="2800" step="100" min="0" required
+                        style="width:100%; padding:10px; background:#2a2a2a; border:1px solid #444;
+                               border-radius:8px; color:#FFD700; font-size:14px; box-sizing:border-box;">
+                </div>
+                <div>
+                    <label style="color:#aaa; font-size:13px; display:block; margin-bottom:6px;">🌄 Пригород (сум/км)</label>
+                    <input type="number" name="suburb_rate" value="3000" step="100" min="0" required
+                        style="width:100%; padding:10px; background:#2a2a2a; border:1px solid #444;
+                               border-radius:8px; color:#FFD700; font-size:14px; box-sizing:border-box;">
+                </div>
+            </div>
 
-            <label>🚕 Посадка (сум)</label>
-            <input type="number" name="base_fare" id="edit-base" required>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:15px; margin-bottom:25px;">
+                <div>
+                    <label style="color:#aaa; font-size:13px; display:block; margin-bottom:6px;">🚖 Мин. тариф (сум)</label>
+                    <input type="number" name="base_fare" value="5000" step="500" min="0" required
+                        style="width:100%; padding:10px; background:#2a2a2a; border:1px solid #444;
+                               border-radius:8px; color:#4CAF50; font-size:14px; box-sizing:border-box;">
+                </div>
+                <div>
+                    <label style="color:#aaa; font-size:13px; display:block; margin-bottom:6px;">⏱️ Ожидание (сум/мин)</label>
+                    <input type="number" name="wait_rate" value="500" step="50" min="0" required
+                        style="width:100%; padding:10px; background:#2a2a2a; border:1px solid #444;
+                               border-radius:8px; color:#17a2b8; font-size:14px; box-sizing:border-box;">
+                </div>
+            </div>
 
-            <label>⏱ Ожидание (сум/мин)</label>
-            <input type="number" name="wait_rate" id="edit-wait" required>
-
-            <div class="modal-footer">
-                <button type="button" class="btn-cancel"
-                        onclick="closeEdit()">
+            <div style="display:flex; gap:10px; justify-content:flex-end;">
+                <button type="button" onclick="closeAddModal()"
+                    style="padding:10px 20px; background:#444; color:#fff; border:none; 
+                           border-radius:8px; cursor:pointer; font-size:14px;">
                     Отмена
                 </button>
-                <button type="submit" class="btn-save">
-                    ✅ Сохранить
+                <button type="submit"
+                    style="padding:10px 20px; background:#28a745; color:#fff; border:none; 
+                           border-radius:8px; cursor:pointer; font-size:14px; font-weight:bold;">
+                    💾 Сохранить
                 </button>
             </div>
         </form>
     </div>
 </div>
-{% endblock %}
 
-{% block scripts %}
-{{ super() }}
+<!-- ════════════════════════════════════════════════════════════ -->
+<!-- МОДАЛКА: РЕДАКТИРОВАТЬ ТАРИФ -->
+<!-- ════════════════════════════════════════════════════════════ -->
+<div id="editModal" style="display:none; position:fixed; top:0; left:0; 
+     width:100%; height:100%; background:rgba(0,0,0,0.7); 
+     z-index:9999; align-items:center; justify-content:center;">
+    <div style="background:#1a1a1a; border-radius:12px; padding:30px; 
+                width:480px; max-width:90%; border: 1px solid #444;">
+
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+            <h3 style="color:#FFD700; margin:0;">✏️ Редактировать тариф</h3>
+            <button onclick="closeEditModal()"
+                style="background:none; border:none; color:#fff; font-size:22px; cursor:pointer;">✕</button>
+        </div>
+
+        <form method="POST" action="{{ url_for('edit_tariff') }}">
+            <input type="hidden" name="tariff_id" id="edit_id">
+
+            <div style="margin-bottom:15px;">
+                <label style="color:#aaa; font-size:13px; display:block; margin-bottom:6px;">Название</label>
+                <input type="text" name="name" id="edit_name" required
+                    style="width:100%; padding:10px; background:#2a2a2a; border:1px solid #444;
+                           border-radius:8px; color:#fff; font-size:14px; box-sizing:border-box;">
+            </div>
+
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:15px; margin-bottom:15px;">
+                <div>
+                    <label style="color:#aaa; font-size:13px; display:block; margin-bottom:6px;">🏙️ Город (сум/км)</label>
+                    <input type="number" name="city_rate" id="edit_city" step="100" min="0" required
+                        style="width:100%; padding:10px; background:#2a2a2a; border:1px solid #444;
+                               border-radius:8px; color:#FFD700; font-size:14px; box-sizing:border-box;">
+                </div>
+                <div>
+                    <label style="color:#aaa; font-size:13px; display:block; margin-bottom:6px;">🌄 Пригород (сум/км)</label>
+                    <input type="number" name="suburb_rate" id="edit_suburb" step="100" min="0" required
+                        style="width:100%; padding:10px; background:#2a2a2a; border:1px solid #444;
+                               border-radius:8px; color:#FFD700; font-size:14px; box-sizing:border-box;">
+                </div>
+            </div>
+
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:15px; margin-bottom:25px;">
+                <div>
+                    <label style="color:#aaa; font-size:13px; display:block; margin-bottom:6px;">🚖 Мин. тариф (сум)</label>
+                    <input type="number" name="base_fare" id="edit_base" step="500" min="0" required
+                        style="width:100%; padding:10px; background:#2a2a2a; border:1px solid #444;
+                               border-radius:8px; color:#4CAF50; font-size:14px; box-sizing:border-box;">
+                </div>
+                <div>
+                    <label style="color:#aaa; font-size:13px; display:block; margin-bottom:6px;">⏱️ Ожидание (сум/мин)</label>
+                    <input type="number" name="wait_rate" id="edit_wait" step="50" min="0" required
+                        style="width:100%; padding:10px; background:#2a2a2a; border:1px solid #444;
+                               border-radius:8px; color:#17a2b8; font-size:14px; box-sizing:border-box;">
+                </div>
+            </div>
+
+            <div style="display:flex; gap:10px; justify-content:flex-end;">
+                <button type="button" onclick="closeEditModal()"
+                    style="padding:10px 20px; background:#444; color:#fff; border:none; 
+                           border-radius:8px; cursor:pointer; font-size:14px;">
+                    Отмена
+                </button>
+                <button type="submit"
+                    style="padding:10px 20px; background:#FFD700; color:#000; border:none; 
+                           border-radius:8px; cursor:pointer; font-size:14px; font-weight:bold;">
+                    💾 Сохранить
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════ -->
+<!-- JAVASCRIPT -->
+<!-- ════════════════════════════════════════════════════════════ -->
 <script>
-function openEdit(id, name, city, suburb, base, wait) {
-    document.getElementById('edit-id').value     = id;
-    document.getElementById('edit-name').value   = name;
-    document.getElementById('edit-city').value   = city;
-    document.getElementById('edit-suburb').value = suburb;
-    document.getElementById('edit-base').value   = base;
-    document.getElementById('edit-wait').value   = wait;
-    document.getElementById('edit-modal').classList.add('open');
+// ── Добавить ──────────────────────────────────────
+function openAddModal() {
+    const modal = document.getElementById('addModal');
+    modal.style.display = 'flex';
 }
 
-function closeEdit() {
-    document.getElementById('edit-modal').classList.remove('open');
+function closeAddModal() {
+    document.getElementById('addModal').style.display = 'none';
 }
 
-document.getElementById('edit-modal')
-    .addEventListener('click', function(e) {
-        if (e.target === this) closeEdit();
-    });
+// ── Редактировать ─────────────────────────────────
+function openEditModal(id, name, city, suburb, base, wait) {
+    document.getElementById('edit_id').value     = id;
+    document.getElementById('edit_name').value   = name;
+    document.getElementById('edit_city').value   = city;
+    document.getElementById('edit_suburb').value = suburb;
+    document.getElementById('edit_base').value   = base;
+    document.getElementById('edit_wait').value   = wait;
+
+    const modal = document.getElementById('editModal');
+    modal.style.display = 'flex';
+}
+
+function closeEditModal() {
+    document.getElementById('editModal').style.display = 'none';
+}
+
+// ── Закрыть по клику вне модалки ─────────────────
+window.onclick = function(e) {
+    const addModal  = document.getElementById('addModal');
+    const editModal = document.getElementById('editModal');
+    if (e.target === addModal)  addModal.style.display  = 'none';
+    if (e.target === editModal) editModal.style.display = 'none';
+}
 </script>
 {% endblock %}
