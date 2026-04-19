@@ -141,9 +141,7 @@
         .btn-reset   { background: #e65100; color: #fff; }
         .btn-history { background: #1a3a5c; color: #60a5fa; border: 1px solid #60a5fa; }
         .btn-balance { background: #1a2e1a; color: #FAD201; border: 1px solid #FAD201; }
-        /* ✅ НОВАЯ КНОПКА ОДОБРИТЬ */
         .btn-approve { background: #1b5e20; color: #4CAF50; border: 1px solid #4CAF50; }
-
         .balance { color: #22c97a; font-weight: bold; }
         .balance.zero { color: #444; }
         .pin-code {
@@ -167,8 +165,6 @@
             color: #444;
         }
         .empty .icon { font-size: 48px; margin-bottom: 12px; }
-
-        /* ✅ МОДАЛ */
         .modal-overlay {
             display: none;
             position: fixed;
@@ -248,13 +244,16 @@
             font-weight: bold;
             cursor: pointer;
         }
-        .btn-cancel       { background: #222; color: #aaa; }
+        .btn-cancel        { background: #222; color: #aaa; }
         .btn-confirm-green { background: #FAD201; color: #000; }
-        .btn-confirm-red  { background: #b71c1c; color: #fff; }
+        .btn-confirm-red   { background: #b71c1c; color: #fff; }
     </style>
 </head>
 <body>
 
+<!-- ═══════════════════════════════════════
+     ШАПКА
+════════════════════════════════════════ -->
 <div class="header">
     <h1>🚕 TAXI 3042</h1>
     <div class="nav">
@@ -267,6 +266,9 @@
     </div>
 </div>
 
+<!-- ═══════════════════════════════════════
+     КОНТЕНТ
+════════════════════════════════════════ -->
 <div class="content">
 
     <div class="page-title">
@@ -305,6 +307,7 @@
                 <th>Статус</th>
                 <th>PIN</th>
                 <th>💰 Баланс</th>
+                <th>⚙ Тариф</th>
                 <th>📍 Онлайн</th>
                 <th>🕐 Последний вход</th>
                 <th>📅 Дата</th>
@@ -372,6 +375,28 @@
                 </td>
 
                 <td>
+                    <span style="
+                        background:#1a2e1a;
+                        padding:4px 10px;
+                        border-radius:6px;
+                        font-size:12px;
+                        font-weight:bold;
+                        color:#FAD201;
+                        display:inline-block;">
+                        {{ driver.tariff_name if driver.tariff_name else 'Стандарт' }}
+                    </span>
+                    <br><br>
+                    <button class="btn btn-balance"
+                        onclick="openTariffModal(
+                            '{{ driver.car_number }}',
+                            '{{ driver.full_name }}',
+                            '{{ driver.tariff_id if driver.tariff_id else 1 }}'
+                        )">
+                        ⚙ Изменить
+                    </button>
+                </td>
+
+                <td>
                     {% set os = driver.online_status or 'offline' %}
                     {% if os == 'online' %}
                         <span class="online-badge online-online">
@@ -405,13 +430,11 @@
                 </td>
 
                 <td>
-                    <!-- История поездок -->
                     <a href="/trips?car={{ driver.car_number }}"
                        class="btn btn-history">
                        🚕 История
                     </a>
 
-                    <!-- Баланс -->
                     <button
                         class="btn btn-balance"
                         onclick="openBalanceModal(
@@ -422,7 +445,6 @@
                         💰 Баланс
                     </button>
 
-                    <!-- ✅ ОДОБРИТЬ - если отклонён или ожидает -->
                     {% if driver.status == 'rejected' or driver.status == 'pending' %}
                         <a href="/approve_direct/{{ driver.car_number }}"
                            class="btn btn-approve"
@@ -431,7 +453,6 @@
                         </a>
                     {% endif %}
 
-                    <!-- Сброс PIN - только для одобренных -->
                     {% if driver.status == 'approved' and not driver.is_blocked %}
                         <a href="/reset_pin/{{ driver.car_number }}"
                            class="btn btn-reset"
@@ -440,7 +461,6 @@
                         </a>
                     {% endif %}
 
-                    <!-- Блок/Разблок -->
                     {% if driver.is_blocked %}
                         <a href="/unblock/{{ driver.car_number }}"
                            class="btn btn-unblock"
@@ -473,7 +493,9 @@
     </div>
 </div>
 
-<!-- ✅ МОДАЛ: УПРАВЛЕНИЕ БАЛАНСОМ -->
+<!-- ═══════════════════════════════════════
+     МОДАЛ: БАЛАНС
+════════════════════════════════════════ -->
 <div class="modal-overlay" id="balance-modal">
     <div class="modal">
         <div class="modal-title">💰 Управление балансом</div>
@@ -532,9 +554,60 @@
     </div>
 </div>
 
+<!-- ═══════════════════════════════════════
+     МОДАЛ: ТАРИФ
+════════════════════════════════════════ -->
+<div class="modal-overlay" id="tariff-modal">
+    <div class="modal">
+        <div class="modal-title">⚙ Изменить тариф</div>
+
+        <form method="POST" action="/driver/set_tariff">
+            <input type="hidden" name="car_number" id="tariff-car">
+
+            <label>Водитель</label>
+            <input type="text" id="tariff-name-show"
+                   disabled style="color:#aaa; cursor:default;">
+
+            <label style="margin-top:14px; display:block;">
+                Выберите тариф
+            </label>
+            <select name="tariff_id" id="tariff-select"
+                    style="width:100%; padding:10px; background:#0f0f0f;
+                           border:1px solid #333; border-radius:8px;
+                           color:#fff; margin-top:6px;">
+                {% for t in tariffs %}
+                <option value="{{ t.id }}">
+                    {{ t.name }} |
+                    Город: {{ t.city_rate }} сум |
+                    Загород: {{ t.suburb_rate }} сум |
+                    Посадка: {{ t.base_fare }} сум |
+                    Ожидание: {{ t.wait_rate }} сум/мин
+                </option>
+                {% endfor %}
+            </select>
+
+            <div class="modal-footer" style="margin-top:20px;">
+                <button type="button"
+                        class="btn-cancel"
+                        onclick="closeTariffModal()">
+                    Отмена
+                </button>
+                <button type="submit"
+                        class="btn-confirm-green">
+                    ✅ Сохранить
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- ═══════════════════════════════════════
+     ВЕСЬ JAVASCRIPT
+════════════════════════════════════════ -->
 <script>
     let currentTab = 'topup';
 
+    // ── БАЛАНС ──────────────────────────────
     function openBalanceModal(car, name, balance) {
         document.getElementById('modal-car').value = car;
         document.getElementById('modal-name').value = name + ' (' + car + ')';
@@ -622,6 +695,22 @@
             alert('❌ Ошибка соединения');
         }
     }
+
+    // ── ТАРИФ ───────────────────────────────
+    function openTariffModal(car, name, currentTariff) {
+        document.getElementById('tariff-car').value = car;
+        document.getElementById('tariff-name-show').value = name + ' (' + car + ')';
+        document.getElementById('tariff-select').value = currentTariff;
+        document.getElementById('tariff-modal').classList.add('open');
+    }
+
+    function closeTariffModal() {
+        document.getElementById('tariff-modal').classList.remove('open');
+    }
+
+    document.getElementById('tariff-modal').addEventListener('click', function(e) {
+        if (e.target === this) closeTariffModal();
+    });
 </script>
 
 </body>
