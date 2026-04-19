@@ -1124,93 +1124,81 @@ def api_get_driver_trips(car_number):
 @flask_app.route('/api/tariffs', methods=['GET'])
 def api_get_tariffs():
     try:
-        return jsonify({
-            "success":     True,
-            "base_fare":   TaxiConfig.BASE_FARE,
-            "city_rate":   TaxiConfig.CITY_RATE,
-            "suburb_rate": TaxiConfig.SUBURB_RATE,
-            "wait_rate":   TaxiConfig.WAIT_RATE
-        }), 200
+        # ✅ Берём из БД, а не из TaxiConfig
+        conn = get_db()
+        c = conn.cursor()
+        c.execute("SELECT city_rate, suburb_rate, base_fare, wait_rate FROM tariffs WHERE id=1")
+        row = c.fetchone()
+        conn.close()
+
+        if row:
+            return jsonify({
+                "success":     True,
+                "city_rate":   row[0],
+                "suburb_rate": row[1],
+                "base_fare":   row[2],
+                "wait_rate":   row[3]
+            }), 200
+        else:
+            return jsonify({
+                "success":     True,
+                "city_rate":   TaxiConfig.CITY_RATE,
+                "suburb_rate": TaxiConfig.SUBURB_RATE,
+                "base_fare":   TaxiConfig.BASE_FARE,
+                "wait_rate":   TaxiConfig.WAIT_RATE
+            }), 200
+
     except Exception as e:
         logging.error(f"Tariffs error: {e}")
         return jsonify({"success": False}), 500
-        
+
+
 @flask_app.route('/api/tariffs', methods=['POST'])
 def api_save_tariffs():
     try:
         data = request.get_json()
 
-        city_rate   = float(data.get('city_rate',   2800))
-        suburb_rate = float(data.get('suburb_rate', 3000))
-        base_fare   = float(data.get('base_fare',   5000))
-        wait_rate   = float(data.get('wait_rate',    500))
+        city_rate   = float(data.get('city_rate',   TaxiConfig.CITY_RATE))
+        suburb_rate = float(data.get('suburb_rate', TaxiConfig.SUBURB_RATE))
+        base_fare   = float(data.get('base_fare',   TaxiConfig.BASE_FARE))
+        wait_rate   = float(data.get('wait_rate',   TaxiConfig.WAIT_RATE))
 
+        # ✅ Сохраняем в БД
         conn = get_db()
         c = conn.cursor()
-        
-        # Обновляем тариф ID=1 (основной)
         c.execute("""
             UPDATE tariffs
             SET city_rate=?, suburb_rate=?, base_fare=?, wait_rate=?
             WHERE id=1
         """, (city_rate, suburb_rate, base_fare, wait_rate))
-        
         conn.commit()
         conn.close()
 
-        # Обновляем TaxiConfig в памяти
+        # ✅ Обновляем TaxiConfig в памяти
         TaxiConfig.CITY_RATE   = city_rate
         TaxiConfig.SUBURB_RATE = suburb_rate
         TaxiConfig.BASE_FARE   = base_fare
         TaxiConfig.WAIT_RATE   = wait_rate
 
-        add_log("api_save_tariffs", 0, 0, "Тарифы обновлены через Android")
+        add_log("api_save_tariffs", 0, 0,
+                f"Тарифы: город={city_rate} пригород={suburb_rate} мин={base_fare} ожидание={wait_rate}")
 
         return jsonify({"success": True, "message": "Тарифы сохранены"}), 200
 
     except Exception as e:
         logging.error(f"api_save_tariffs error: {e}")
         return jsonify({"success": False, "message": str(e)}), 500
-        
-        # ✅ СТРАНИЦА ТАРИФОВ
-@flask_app.route('/tariffs')
-@admin_required
-def tariffs_page():
-    tariffs = get_all_tariffs()
-    return render_template('tariffs.html', tariffs=tariffs)
 
-# ✅ СОЗДАТЬ ТАРИФ
-@flask_app.route('/tariffs/add', methods=['POST'])
-@admin_required
-def add_tariff():
-    name        = request.form.get('name', '').strip()
-    city_rate   = float(request.form.get('city_rate', 2800))
-    suburb_rate = float(request.form.get('suburb_rate', 3000))
-    base_fare   = float(request.form.get('base_fare', 5000))
-    wait_rate   = float(request.form.get('wait_rate', 500))
 
-    conn = get_db()
-    c = conn.cursor()
-    c.execute("""
-        INSERT INTO tariffs (name, city_rate, suburb_rate, base_fare, wait_rate)
-        VALUES (?, ?, ?, ?, ?)
-    """, (name, city_rate, suburb_rate, base_fare, wait_rate))
-    conn.commit()
-    conn.close()
-
-    add_log("add_tariff", 0, 0, f"Тариф: {name}")
-    return redirect(url_for('tariffs_page'))
-
-# ✅ ИЗМЕНИТЬ ТАРИФ
 @flask_app.route('/tariffs/edit', methods=['POST'])
 @admin_required
 def edit_tariff():
     tariff_id   = request.form.get('tariff_id')
     name        = request.form.get('name', '').strip()
-    city_rate   = float(request.form.get('city_rate', 2800))
+    city_rate   = float(request.form.get('city_rate',   2800))
     suburb_rate = float(request.form.get('suburb_rate', 3000))
-    base_fare   = float(request.form.get('base_fare', 5000))
-    wait_rate   = float(request.form.get('wait_rate', 500))
+    base_fare   = float(request.form.get('base_fare',   5000))
+    wait_rate   = float(request.form.get('wait_rate',    500))
 
     conn = get_db()
     c = conn.cursor()
@@ -1222,24 +1210,38 @@ def edit_tariff():
     conn.commit()
     conn.close()
 
+    # ✅ Если редактируем ID=1 — обновляем TaxiConfig
+    if str(tariff_id) == '1':
+        TaxiConfig.CITY_RATE   = city_rate
+        TaxiConfig.SUBURB_RATE = suburb_rate
+        TaxiConfig.BASE_FARE   = base_fare
+        TaxiConfig.WAIT_RATE   = wait_rate
+
     add_log("edit_tariff", 0, 0, f"Тариф ID:{tariff_id} → {name}")
     return redirect(url_for('tariffs_page'))
 
-# ✅ УДАЛИТЬ ТАРИФ
-@flask_app.route('/tariffs/delete/<int:tariff_id>')
-@admin_required
-def delete_tariff(tariff_id):
-    if tariff_id == 1:
-        return redirect(url_for('tariffs_page'))
-    conn = get_db()
-    c = conn.cursor()
-    c.execute("DELETE FROM tariffs WHERE id=?", (tariff_id,))
-    conn.commit()
-    conn.close()
-    return redirect(url_for('tariffs_page'))
 
 # ==================== ЗАПУСК ====================
+def init_taxiconfig_from_db():
+    """При старте загружаем тарифы из БД в TaxiConfig"""
+    try:
+        conn = get_db()
+        c = conn.cursor()
+        c.execute("SELECT city_rate, suburb_rate, base_fare, wait_rate FROM tariffs WHERE id=1")
+        row = c.fetchone()
+        conn.close()
+
+        if row:
+            TaxiConfig.CITY_RATE   = row[0]
+            TaxiConfig.SUBURB_RATE = row[1]
+            TaxiConfig.BASE_FARE   = row[2]
+            TaxiConfig.WAIT_RATE   = row[3]
+            logging.info(f"✅ TaxiConfig загружен из БД: город={row[0]} пригород={row[1]}")
+    except Exception as e:
+        logging.error(f"❌ init_taxiconfig_from_db error: {e}")
+
 init_db()
+init_taxiconfig_from_db()  # ← ДОБАВЬ ЭТУ СТРОКУ
 app = flask_app
 
 if __name__ == "__main__":
