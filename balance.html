@@ -6,212 +6,45 @@
     <title>Баланс — Такси 3042</title>
     <style>
         * { margin:0; padding:0; box-sizing:border-box; }
+        body { font-family: 'Segoe UI', sans-serif; background: #0f0f1a; color: #fff; min-height: 100vh; }
 
-        body {
-            font-family: 'Segoe UI', sans-serif;
-            background: #0f0f1a;
-            color: #fff;
-            min-height: 100vh;
-        }
+        /* NAVBAR */
+        .navbar { background: #1a1a2e; padding: 0 30px; display: flex; align-items: center; height: 60px; border-bottom: 1px solid #2a2a4a; position: sticky; top: 0; z-index: 100; }
+        .nav-brand { font-size: 18px; font-weight: 700; color: #f5c518; margin-right: 30px; }
+        .nav-links { display: flex; gap: 4px; flex: 1; }
+        .nav-links a { color: #aaa; text-decoration: none; padding: 8px 14px; border-radius: 8px; font-size: 13px; transition: all 0.2s; }
+        .nav-links a:hover { background: #2a2a4a; color: #fff; }
+        .nav-links a.active { background: #f5c518; color: #000; font-weight: 600; }
 
-        /* ===== NAVBAR ===== */
-        .navbar {
-            background: #1a1a2e;
-            padding: 0 30px;
-            display: flex;
-            align-items: center;
-            gap: 0;
-            height: 60px;
-            border-bottom: 1px solid #2a2a4a;
-            position: sticky;
-            top: 0;
-            z-index: 100;
-        }
-        .nav-brand {
-            font-size: 18px;
-            font-weight: 700;
-            color: #f5c518;
-            margin-right: 30px;
-            white-space: nowrap;
-        }
-        .nav-links { display:flex; gap:4px; flex:1; }
-        .nav-links a {
-            color: #aaa;
-            text-decoration: none;
-            padding: 8px 14px;
-            border-radius: 8px;
-            font-size: 13px;
-            transition: all 0.2s;
-            white-space: nowrap;
-        }
-        .nav-links a:hover { background:#2a2a4a; color:#fff; }
-        .nav-links a.active { background:#f5c518; color:#000; font-weight:600; }
-
-        /* ===== MAIN ===== */
+        /* MAIN */
         .main { padding: 28px 30px; max-width: 1400px; margin: 0 auto; }
-
-        .page-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
-            margin-bottom: 24px;
-            flex-wrap: wrap;
-            gap: 15px;
-        }
+        .page-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 24px; flex-wrap: wrap; gap: 15px; }
         .page-title { font-size: 26px; font-weight: 700; color: #f5c518; }
         .page-sub { font-size: 13px; color: #888; margin-top: 4px; }
 
-        /* ===== STATS ===== */
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 16px;
-            margin-bottom: 24px;
-        }
-        .stat-card {
-            background: #1a1a2e;
-            border: 1px solid #2a2a4a;
-            border-radius: 14px;
-            padding: 18px 20px;
-        }
+        /* STATS */
+        .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px; }
+        .stat-card { background: #1a1a2e; border: 1px solid #2a2a4a; border-radius: 14px; padding: 18px 20px; }
         .stat-icon { font-size: 28px; margin-bottom: 10px; }
-        .stat-val {
-            font-size: 24px;
-            font-weight: 700;
-            color: #fff;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
+        .stat-val { font-size: 24px; font-weight: 700; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .stat-lbl { font-size: 12px; color: #888; margin-top: 4px; }
 
-        /* ===== CONTROLS ===== */
-        .controls {
-            display: flex;
-            gap: 12px;
-            margin-bottom: 20px;
-            flex-wrap: wrap;
-            align-items: center;
-        }
+        /* CONTROLS */
+        .controls { display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; align-items: center; }
         .search-wrap { position: relative; flex: 1; min-width: 220px; }
-        .search-wrap input {
-            width: 100%;
-            padding: 10px 14px 10px 38px;
-            background: #1a1a2e;
-            border: 1px solid #2a2a4a;
-            border-radius: 10px;
-            color: #fff;
-            font-size: 14px;
-            outline: none;
-        }
+        .search-wrap input { width: 100%; padding: 10px 14px 10px 38px; background: #1a1a2e; border: 1px solid #2a2a4a; border-radius: 10px; color: #fff; font-size: 14px; outline: none; }
         .search-wrap input:focus { border-color: #f5c518; }
-        .search-icon {
-            position: absolute;
-            left: 12px; top: 50%;
-            transform: translateY(-50%);
-            font-size: 16px;
-        }
-        select.filter {
-            padding: 10px 14px;
-            background: #1a1a2e;
-            border: 1px solid #2a2a4a;
-            border-radius: 10px;
-            color: #fff;
-            font-size: 13px;
-            outline: none;
-            cursor: pointer;
-        }
+        .search-icon { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); font-size: 16px; }
+        select.filter { padding: 10px 14px; background: #1a1a2e; border: 1px solid #2a2a4a; border-radius: 10px; color: #fff; font-size: 13px; outline: none; cursor: pointer; }
         select.filter:focus { border-color: #f5c518; }
 
-        .btn {
-            padding: 10px 18px;
-            border: none;
-            border-radius: 10px;
-            cursor: pointer;
-            font-size: 13px;
-            font-weight: 600;
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            transition: all 0.2s;
-            text-decoration: none;
-        }
+        /* BUTTONS */
+        .btn { padding: 10px 18px; border: none; border-radius: 10px; cursor: pointer; font-size: 13px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; transition: all 0.2s; text-decoration: none; }
         .btn-yellow { background: #f5c518; color: #000; }
         .btn-yellow:hover { background: #e0b015; }
-        .btn-outline {
-            background: transparent;
-            color: #888;
-            border: 1px solid #2a2a4a;
-        }
+        .btn-outline { background: transparent; color: #888; border: 1px solid #2a2a4a; }
         .btn-outline:hover { border-color: #f5c518; color: #f5c518; }
-
-        /* ===== TABLE ===== */
-        .table-box {
-            background: #1a1a2e;
-            border: 1px solid #2a2a4a;
-            border-radius: 14px;
-            overflow: hidden;
-        }
-        .table-box-head {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 16px 20px;
-            border-bottom: 1px solid #2a2a4a;
-        }
-        .table-box-title { font-size: 15px; font-weight: 600; }
-
-        table { width: 100%; border-collapse: collapse; }
-        thead th {
-            padding: 12px 16px;
-            text-align: left;
-            font-size: 11px;
-            font-weight: 600;
-            color: #666;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            background: rgba(255,255,255,0.02);
-        }
-        tbody tr { border-top: 1px solid #1e1e35; transition: background 0.15s; }
-        tbody tr:hover { background: rgba(255,255,255,0.025); }
-        tbody td { padding: 14px 16px; font-size: 14px; }
-
-        .drv-info { display: flex; align-items: center; gap: 10px; }
-        .drv-avatar {
-            width: 38px; height: 38px;
-            border-radius: 50%;
-            background: linear-gradient(135deg, #f5c518, #ff7e35);
-            display: flex; align-items: center; justify-content: center;
-            font-weight: 700; font-size: 14px; color: #000;
-            flex-shrink: 0;
-        }
-        .drv-name { font-weight: 600; font-size: 14px; }
-        .drv-car { font-size: 12px; color: #888; margin-top: 2px; }
-
-        .bal-pos { color: #22c55e; font-weight: 700; font-size: 15px; }
-        .bal-low { color: #f59e0b; font-weight: 700; font-size: 15px; }
-        .bal-zero { color: #ef4444; font-weight: 700; font-size: 15px; }
-
-        .badge {
-            padding: 3px 9px;
-            border-radius: 20px;
-            font-size: 11px;
-            font-weight: 600;
-        }
-        .badge-green { background: rgba(34,197,94,.15); color: #22c55e; }
-        .badge-yellow { background: rgba(245,158,11,.15); color: #f59e0b; }
-        .badge-red { background: rgba(239,68,68,.15); color: #ef4444; }
-
-        .act-btns { display: flex; gap: 6px; flex-wrap: wrap; }
-        .btn-xs {
-            padding: 5px 11px;
-            border: none;
-            border-radius: 7px;
-            cursor: pointer;
-            font-size: 11px;
-            font-weight: 600;
-            transition: all 0.2s;
-        }
+        .btn-xs { padding: 5px 11px; border: none; border-radius: 7px; cursor: pointer; font-size: 11px; font-weight: 600; transition: all 0.2s; }
         .btn-xs-green { background: rgba(34,197,94,.15); color: #22c55e; }
         .btn-xs-green:hover { background: rgba(34,197,94,.3); }
         .btn-xs-red { background: rgba(239,68,68,.15); color: #ef4444; }
@@ -219,99 +52,62 @@
         .btn-xs-blue { background: rgba(99,102,241,.15); color: #818cf8; }
         .btn-xs-blue:hover { background: rgba(99,102,241,.3); }
 
-        /* ===== MODAL ===== */
-        .overlay {
-            display: none;
-            position: fixed; inset: 0;
-            background: rgba(0,0,0,.65);
-            z-index: 500;
-            align-items: center;
-            justify-content: center;
-            backdrop-filter: blur(3px);
-        }
+        /* TABLE */
+        .table-box { background: #1a1a2e; border: 1px solid #2a2a4a; border-radius: 14px; overflow: hidden; }
+        .table-box-head { display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; border-bottom: 1px solid #2a2a4a; }
+        .table-box-title { font-size: 15px; font-weight: 600; }
+        table { width: 100%; border-collapse: collapse; }
+        thead th { padding: 12px 16px; text-align: left; font-size: 11px; font-weight: 600; color: #666; text-transform: uppercase; letter-spacing: 0.5px; background: rgba(255,255,255,0.02); }
+        tbody tr { border-top: 1px solid #1e1e35; transition: background 0.15s; }
+        tbody tr:hover { background: rgba(255,255,255,0.025); }
+        tbody td { padding: 14px 16px; font-size: 14px; }
+
+        /* DRIVER INFO */
+        .drv-info { display: flex; align-items: center; gap: 10px; }
+        .drv-avatar { width: 38px; height: 38px; border-radius: 50%; background: linear-gradient(135deg, #f5c518, #ff7e35); display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 14px; color: #000; flex-shrink: 0; }
+        .drv-name { font-weight: 600; font-size: 14px; }
+        .drv-car { font-size: 12px; color: #888; margin-top: 2px; }
+
+        /* BALANCE */
+        .bal-pos { color: #22c55e; font-weight: 700; font-size: 15px; }
+        .bal-low { color: #f59e0b; font-weight: 700; font-size: 15px; }
+        .bal-zero { color: #ef4444; font-weight: 700; font-size: 15px; }
+
+        /* BADGES */
+        .badge { padding: 3px 9px; border-radius: 20px; font-size: 11px; font-weight: 600; }
+        .badge-green { background: rgba(34,197,94,.15); color: #22c55e; }
+        .badge-yellow { background: rgba(245,158,11,.15); color: #f59e0b; }
+        .badge-red { background: rgba(239,68,68,.15); color: #ef4444; }
+        .badge-tariff { background: #1a2e1a; color: #FAD201; padding: 4px 10px; border-radius: 8px; font-size: 12px; font-weight: bold; }
+
+        .act-btns { display: flex; gap: 6px; flex-wrap: wrap; }
+
+        /* MODAL */
+        .overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.65); z-index: 500; align-items: center; justify-content: center; backdrop-filter: blur(3px); }
         .overlay.on { display: flex; }
-
-        .modal {
-            background: #1a1a2e;
-            border: 1px solid #2a2a4a;
-            border-radius: 18px;
-            padding: 28px;
-            width: 460px;
-            max-width: 95vw;
-            animation: pop .25s ease;
-        }
-        @keyframes pop {
-            from { transform: scale(.95); opacity: 0; }
-            to   { transform: scale(1);  opacity: 1; }
-        }
+        .modal { background: #1a1a2e; border: 1px solid #2a2a4a; border-radius: 18px; padding: 28px; width: 460px; max-width: 95vw; animation: pop .25s ease; }
+        @keyframes pop { from { transform: scale(.95); opacity: 0; } to { transform: scale(1); opacity: 1; } }
         .modal-title { font-size: 18px; font-weight: 700; margin-bottom: 20px; }
-
         .fg { margin-bottom: 16px; }
         .fg label { display: block; font-size: 12px; color: #888; margin-bottom: 6px; }
-        .fg input, .fg select, .fg textarea {
-            width: 100%;
-            padding: 10px 14px;
-            background: #0f0f1a;
-            border: 1px solid #2a2a4a;
-            border-radius: 9px;
-            color: #fff;
-            font-size: 14px;
-            outline: none;
-            transition: border-color .2s;
-        }
+        .fg input, .fg select { width: 100%; padding: 10px 14px; background: #0f0f1a; border: 1px solid #2a2a4a; border-radius: 9px; color: #fff; font-size: 14px; outline: none; transition: border-color .2s; }
         .fg input:focus, .fg select:focus { border-color: #f5c518; }
-
         .quick-btns { display: flex; gap: 7px; margin-top: 9px; flex-wrap: wrap; }
-        .q-btn {
-            padding: 5px 12px;
-            background: #0f0f1a;
-            border: 1px solid #2a2a4a;
-            border-radius: 7px;
-            color: #888;
-            cursor: pointer;
-            font-size: 12px;
-            transition: all .2s;
-        }
+        .q-btn { padding: 5px 12px; background: #0f0f1a; border: 1px solid #2a2a4a; border-radius: 7px; color: #888; cursor: pointer; font-size: 12px; transition: all .2s; }
         .q-btn:hover { border-color: #f5c518; color: #f5c518; }
-
         .modal-foot { display: flex; gap: 10px; margin-top: 22px; }
         .modal-foot .btn { flex: 1; justify-content: center; }
 
-        /* ===== EMPTY ===== */
-        .empty {
-            text-align: center;
-            padding: 50px 20px;
-            color: #555;
-        }
+        /* EMPTY */
+        .empty { text-align: center; padding: 50px 20px; color: #555; }
         .empty-icon { font-size: 48px; margin-bottom: 12px; }
 
-        /* ===== TOAST ===== */
-        .toast {
-            position: fixed;
-            bottom: 24px; right: 24px;
-            background: #1a1a2e;
-            border: 1px solid #2a2a4a;
-            border-radius: 10px;
-            padding: 14px 18px;
-            font-size: 13px;
-            z-index: 9999;
-            opacity: 0;
-            transform: translateY(20px);
-            transition: all .3s;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
+        /* TOAST */
+        .toast { position: fixed; bottom: 24px; right: 24px; background: #1a1a2e; border: 1px solid #2a2a4a; border-radius: 10px; padding: 14px 18px; font-size: 13px; z-index: 9999; opacity: 0; transform: translateY(20px); transition: all .3s; display: flex; align-items: center; gap: 8px; }
         .toast.show { opacity: 1; transform: translateY(0); }
 
-        @media(max-width:900px) {
-            .stats-grid { grid-template-columns: repeat(2,1fr); }
-            .nav-links { display: none; }
-            .main { padding: 15px; }
-        }
-        @media(max-width:600px) {
-            .stats-grid { grid-template-columns: 1fr 1fr; }
-        }
+        @media(max-width:900px) { .stats-grid { grid-template-columns: repeat(2,1fr); } .nav-links { display: none; } .main { padding: 15px; } }
+        @media(max-width:600px) { .stats-grid { grid-template-columns: 1fr 1fr; } }
     </style>
 </head>
 <body>
@@ -400,6 +196,7 @@
             <thead>
                 <tr>
                     <th>Водитель</th>
+                    <th>Тариф</th>
                     <th>Баланс</th>
                     <th>Поездок</th>
                     <th>Пополнено</th>
@@ -413,6 +210,8 @@
             <tr data-name="{{ d.full_name|lower }}"
                 data-car="{{ d.car_number|lower }}"
                 data-balance="{{ d.balance or 0 }}">
+
+                <!-- ВОДИТЕЛЬ -->
                 <td>
                     <div class="drv-info">
                         <div class="drv-avatar">
@@ -424,6 +223,15 @@
                         </div>
                     </div>
                 </td>
+
+                <!-- ✅ ТАРИФ -->
+                <td>
+                    <span class="badge-tariff">
+                        {{ d.tariff_name if d.tariff_name else 'Стандарт' }}
+                    </span>
+                </td>
+
+                <!-- БАЛАНС -->
                 <td>
                     {% set bal = d.balance or 0 %}
                     {% if bal >= 50000 %}
@@ -438,13 +246,21 @@
                         <span class="bal-zero">0 сум</span>
                     {% endif %}
                 </td>
+
+                <!-- ПОЕЗДКИ -->
                 <td style="color:#aaa;">{{ d.trip_count or 0 }}</td>
+
+                <!-- ПОПОЛНЕНО -->
                 <td style="color:#22c55e;">
                     +{{ "{:,.0f}".format(d.total_topup or 0) }} сум
                 </td>
+
+                <!-- СПИСАНО -->
                 <td style="color:#ef4444;">
                     -{{ "{:,.0f}".format(d.total_spent or 0) }} сум
                 </td>
+
+                <!-- СТАТУС -->
                 <td>
                     {% set bal = d.balance or 0 %}
                     {% if bal >= 10000 %}
@@ -455,6 +271,8 @@
                         <span class="badge badge-red">🔴 Нулевой</span>
                     {% endif %}
                 </td>
+
+                <!-- ДЕЙСТВИЯ -->
                 <td>
                     <div class="act-btns">
                         <button class="btn-xs btn-xs-green"
@@ -485,7 +303,7 @@
     </div>
 </div>
 
-<!-- ===== MODAL: ПОПОЛНЕНИЕ ===== -->
+<!-- MODAL: ПОПОЛНЕНИЕ -->
 <div class="overlay" id="add-modal">
     <div class="modal">
         <div class="modal-title" style="color:#22c55e;">➕ Пополнение баланса</div>
@@ -517,7 +335,8 @@
             <div class="fg">
                 <label>Описание</label>
                 <input type="text" name="description"
-                       value="Пополнение баланса" placeholder="Причина пополнения">
+                       value="Пополнение баланса"
+                       placeholder="Причина пополнения">
             </div>
             <div class="modal-foot">
                 <button type="button" class="btn btn-outline"
@@ -528,7 +347,7 @@
     </div>
 </div>
 
-<!-- ===== MODAL: СПИСАНИЕ ===== -->
+<!-- MODAL: СПИСАНИЕ -->
 <div class="overlay" id="deduct-modal">
     <div class="modal">
         <div class="modal-title" style="color:#ef4444;">📤 Списание с баланса</div>
@@ -575,33 +394,25 @@
 <div class="toast" id="toast">✅ <span id="toast-text">Готово</span></div>
 
 <script>
-// ===== MODAL =====
 function openModal(id) {
     document.getElementById(id).classList.add('on');
 }
 function closeModal(id) {
     document.getElementById(id).classList.remove('on');
 }
-// Закрыть по фону
 document.querySelectorAll('.overlay').forEach(o => {
     o.addEventListener('click', e => {
         if (e.target === o) o.classList.remove('on');
     });
 });
-
-// ===== БЫСТРЫЙ ВЫБОР СУММЫ =====
 function setAmt(fieldId, val) {
     document.getElementById(fieldId).value = val;
 }
-
-// ===== ОТКРЫТЬ ПОПОЛНЕНИЕ ДЛЯ КОНКРЕТНОГО ВОДИТЕЛЯ =====
 function openTopup(car, name) {
     document.getElementById('topup-car').value = car;
     document.getElementById('topup-amount').value = '';
     openModal('add-modal');
 }
-
-// ===== ОТКРЫТЬ СПИСАНИЕ =====
 function openDeduct(car, name, balance) {
     document.getElementById('deduct-car').value = car;
     document.getElementById('deduct-name-show').value = name + ' (' + car + ')';
@@ -610,8 +421,6 @@ function openDeduct(car, name, balance) {
     document.getElementById('deduct-amount').value = '';
     openModal('deduct-modal');
 }
-
-// ===== ФИЛЬТР ТАБЛИЦЫ =====
 function filterTable() {
     const q      = document.getElementById('search-input').value.toLowerCase();
     const filter = document.getElementById('status-filter').value;
@@ -635,21 +444,17 @@ function filterTable() {
         if (show) visible++;
     });
 
-    document.getElementById('count-label').textContent =
-        'Показано: ' + visible;
+    document.getElementById('count-label').textContent = 'Показано: ' + visible;
 }
-
-// ===== TOAST =====
 function showToast(text) {
     const t = document.getElementById('toast');
     document.getElementById('toast-text').textContent = text;
     t.classList.add('show');
     setTimeout(() => t.classList.remove('show'), 3000);
 }
-
-// Показываем toast если пришли с redirect
 const params = new URLSearchParams(location.search);
 if (params.get('ok') === '1') showToast('Операция выполнена успешно!');
 </script>
+
 </body>
 </html>
