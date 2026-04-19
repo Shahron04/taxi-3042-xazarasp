@@ -3,7 +3,7 @@ import sqlite3
 import secrets
 from datetime import datetime, timedelta
 from functools import wraps
-from zoneinfo import ZoneInfo        # ← НОВЫЙ ИМПОРТ
+from zoneinfo import ZoneInfo
 
 from flask import (Flask, render_template, request,
                    redirect, url_for, session, jsonify)
@@ -16,7 +16,7 @@ SECRET_KEY      = os.environ.get("SECRET_KEY", "taxi2024secret").strip()
 PIN_EXPIRE_DAYS = 30
 PORT            = int(os.environ.get("PORT", 5000))
 
-# ==================== ТАРИФЫ ====================
+# ==================== ТАРИФЫ (ГЛОБАЛЬНЫЕ) ====================
 class TaxiConfig:
     BASE_FARE   = 5000.0
     CITY_RATE   = 2800.0
@@ -34,6 +34,7 @@ def init_db():
     conn = get_db()
     c = conn.cursor()
 
+    # ✅ ВОДИТЕЛИ
     c.execute("""
         CREATE TABLE IF NOT EXISTS drivers (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -50,20 +51,44 @@ def init_db():
             created_at TEXT DEFAULT CURRENT_TIMESTAMP,
             balance REAL DEFAULT 0.0,
             online_status TEXT DEFAULT 'offline',
-            last_seen TEXT DEFAULT NULL
+            last_seen TEXT DEFAULT NULL,
+            tariff_id INTEGER DEFAULT 1
         )
     """)
 
+    # ✅ ДОБАВЛЯЕМ ПОЛЯ ЕСЛИ НЕ СУЩЕСТВУЕТ
     for col, definition in [
         ("balance",       "REAL DEFAULT 0.0"),
         ("online_status", "TEXT DEFAULT 'offline'"),
         ("last_seen",     "TEXT DEFAULT NULL"),
+        ("tariff_id",     "INTEGER DEFAULT 1"),
     ]:
         try:
             c.execute(f"ALTER TABLE drivers ADD COLUMN {col} {definition}")
         except:
             pass
 
+    # ✅ ТАРИФЫ
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS tariffs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            city_rate REAL DEFAULT 2800,
+            suburb_rate REAL DEFAULT 3000,
+            base_fare REAL DEFAULT 5000,
+            wait_rate REAL DEFAULT 500
+        )
+    """)
+
+    # ✅ СТАНДАРТНЫЙ ТАРИФ
+    c.execute("SELECT COUNT(*) FROM tariffs")
+    if c.fetchone()[0] == 0:
+        c.execute("""
+            INSERT INTO tariffs (name, city_rate, suburb_rate, base_fare, wait_rate)
+            VALUES ('Стандарт', 2800, 3000, 5000, 500)
+        """)
+
+    # ✅ ЛОГИ
     c.execute("""
         CREATE TABLE IF NOT EXISTS logs (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -75,6 +100,7 @@ def init_db():
         )
     """)
 
+    # ✅ BROADCASTS
     c.execute("""
         CREATE TABLE IF NOT EXISTS broadcasts (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -84,6 +110,7 @@ def init_db():
         )
     """)
 
+    # ✅ ПОЕЗДКИ
     c.execute("""
         CREATE TABLE IF NOT EXISTS trips (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -97,7 +124,7 @@ def init_db():
         )
     """)
 
-    # ✅ НОВАЯ ТАБЛИЦА ТРАНЗАКЦИЙ
+    # ✅ ТРАНЗАКЦИИ
     c.execute("""
         CREATE TABLE IF NOT EXISTS transactions (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -340,8 +367,6 @@ def get_stats():
     stats['trips_total'] = c.fetchone()[0]
     c.execute("SELECT COALESCE(SUM(price), 0) FROM trips")
     stats['earnings_total'] = c.fetchone()[0]
-
-    # ✅ НОВОЕ: статистика баланса
     c.execute("SELECT COALESCE(SUM(balance), 0) FROM drivers WHERE status='approved'")
     stats['total_balance'] = c.fetchone()[0]
     c.execute("SELECT COUNT(*) FROM drivers WHERE balance < 10000 AND status='approved'")
@@ -356,7 +381,6 @@ def get_stats():
         WHERE type='credit' AND created_at LIKE ?
     """, (f"{today}%",))
     stats['topup_today'] = c.fetchone()[0]
-
     conn.close()
     return stats
 
@@ -368,23 +392,18 @@ def get_logs():
     conn.close()
     return logs
 
-# ==================== НОВЫЕ ФУНКЦИИ БАЛАНСА ====================
-
+# ==================== БАЛАНС ====================
 def topup_driver_balance(car_number, amount, description="Пополнение баланса"):
-    """Пополнить баланс водителя"""
     conn = get_db()
     c = conn.cursor()
-    # Обновить баланс
     c.execute("""
         UPDATE drivers SET balance = balance + ?
         WHERE car_number = ?
     """, (amount, car_number.upper()))
-    # Записать транзакцию
     c.execute("""
         INSERT INTO transactions (car_number, amount, type, description)
         VALUES (?, ?, 'credit', ?)
     """, (car_number.upper(), amount, description))
-    # Получить новый баланс
     c.execute("SELECT balance FROM drivers WHERE car_number = ?",
               (car_number.upper(),))
     row = c.fetchone()
@@ -394,10 +413,8 @@ def topup_driver_balance(car_number, amount, description="Пополнение �
     return new_balance
 
 def deduct_driver_balance(car_number, amount, description="Списание"):
-    """Списать с баланса водителя"""
     conn = get_db()
     c = conn.cursor()
-    # Проверить текущий баланс
     c.execute("SELECT balance FROM drivers WHERE car_number = ?",
               (car_number.upper(),))
     row = c.fetchone()
@@ -408,12 +425,10 @@ def deduct_driver_balance(car_number, amount, description="Списание"):
     if current < amount:
         conn.close()
         return False, "Недостаточно средств", current
-    # Списать
     c.execute("""
         UPDATE drivers SET balance = balance - ?
         WHERE car_number = ?
     """, (amount, car_number.upper()))
-    # Записать транзакцию
     c.execute("""
         INSERT INTO transactions (car_number, amount, type, description)
         VALUES (?, ?, 'debit', ?)
@@ -426,7 +441,6 @@ def deduct_driver_balance(car_number, amount, description="Списание"):
     return True, "OK", new_balance
 
 def get_driver_transactions(car_number, limit=50):
-    """История транзакций водителя"""
     conn = get_db()
     c = conn.cursor()
     c.execute("""
@@ -440,7 +454,6 @@ def get_driver_transactions(car_number, limit=50):
     return txs
 
 def get_all_drivers_balance():
-    """Все водители с балансами для дашборда"""
     conn = get_db()
     c = conn.cursor()
     c.execute("""
@@ -459,6 +472,39 @@ def get_all_drivers_balance():
     conn.close()
     return drivers
 
+# ==================== ТАРИФЫ ====================
+def get_all_tariffs():
+    conn = get_db()
+    c = conn.cursor()
+    c.execute("SELECT * FROM tariffs ORDER BY id")
+    tariffs = c.fetchall()
+    conn.close()
+    return tariffs
+
+def get_driver_tariff(car_number):
+    conn = get_db()
+    c = conn.cursor()
+    c.execute("""
+        SELECT t.*
+        FROM drivers d
+        LEFT JOIN tariffs t ON t.id = d.tariff_id
+        WHERE d.car_number = ?
+    """, (car_number.upper(),))
+    tariff = c.fetchone()
+    conn.close()
+    return tariff
+
+def set_driver_tariff(car_number, tariff_id):
+    conn = get_db()
+    c = conn.cursor()
+    c.execute("""
+        UPDATE drivers
+        SET tariff_id = ?
+        WHERE car_number = ?
+    """, (tariff_id, car_number.upper()))
+    conn.commit()
+    conn.close()
+
 # ==================== FLASK ====================
 flask_app = Flask(__name__, template_folder='.')
 flask_app.secret_key = SECRET_KEY
@@ -471,6 +517,7 @@ def admin_required(f):
         return f(*args, **kwargs)
     return decorated
 
+# ==================== ADMIN ROUTES ====================
 @flask_app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
@@ -491,12 +538,46 @@ def logout():
 def dashboard():
     return render_template('dashboard.html', stats=get_stats())
 
+# ✅ DRIVERS С ТАРИФАМИ
 @flask_app.route('/drivers')
 @admin_required
 def drivers():
-    query = request.args.get('search', '')
+    query        = request.args.get('search', '')
     drivers_list = search_drivers(query) if query else get_all_drivers()
-    return render_template('drivers.html', drivers=drivers_list, search=query)
+    tariffs      = get_all_tariffs()
+
+    # ✅ добавляем имя тарифа каждому водителю
+    for d in drivers_list:
+        tariff = get_driver_tariff(d['car_number'])
+        if tariff:
+            d['tariff_name'] = tariff['name']
+            d['tariff_id']   = tariff['id']
+        else:
+            d['tariff_name'] = "Стандарт"
+            d['tariff_id']   = 1
+
+    return render_template(
+        'drivers.html',
+        drivers=drivers_list,
+        search=query,
+        tariffs=tariffs
+    )
+
+# ✅ СМЕНА ТАРИФА
+@flask_app.route('/driver/set_tariff', methods=['POST'])
+@admin_required
+def web_set_tariff():
+    car_number = request.form.get('car_number', '').strip().upper()
+    tariff_id  = request.form.get('tariff_id')
+
+    if not car_number or not tariff_id:
+        return redirect(url_for('drivers'))
+
+    set_driver_tariff(car_number, tariff_id)
+    add_log("set_tariff", 0, 0,
+            f"Авто: {car_number} | Тариф ID: {tariff_id}")
+
+    return redirect(url_for('drivers'))
 
 @flask_app.route('/requests')
 @admin_required
@@ -518,11 +599,9 @@ def web_reject(car_number):
     add_log("reject", 0, 0, f"Авто: {car_number}")
     return redirect(url_for('requests_page'))
 
-# ✅ ДОБАВЬ ЭТО ПОСЛЕ
 @flask_app.route('/approve_direct/<car_number>')
 @admin_required
 def web_approve_direct(car_number):
-    """Одобрить водителя напрямую из списка водителей"""
     pin = approve_driver_by_car(car_number)
     add_log("approve", 0, 0, f"Авто: {car_number} PIN: {pin}")
     return redirect(url_for('drivers'))
@@ -589,7 +668,7 @@ def trips_page():
 def broadcast():
     return render_template('broadcast.html')
 
-# ✅ НОВЫЙ РОУТ - СТРАНИЦА БАЛАНСА
+# ==================== БАЛАНС ROUTES ====================
 @flask_app.route('/balance')
 @admin_required
 def balance_page():
@@ -599,7 +678,6 @@ def balance_page():
                            drivers=drivers_list,
                            stats=stats)
 
-# ✅ НОВЫЙ РОУТ - Пополнение через веб-форму
 @flask_app.route('/balance/topup', methods=['POST'])
 @admin_required
 def web_topup():
@@ -616,7 +694,6 @@ def web_topup():
             f"Баланс: {new_balance:,.0f} сум")
     return redirect(url_for('balance_page'))
 
-# ✅ НОВЫЙ РОУТ - Списание через веб-форму
 @flask_app.route('/balance/deduct', methods=['POST'])
 @admin_required
 def web_deduct():
@@ -634,7 +711,6 @@ def web_deduct():
                 f"Баланс: {new_balance:,.0f} сум")
     return redirect(url_for('balance_page'))
 
-# ✅ НОВЫЙ РОУТ - История транзакций (страница)
 @flask_app.route('/balance/history/<car_number>')
 @admin_required
 def balance_history(car_number):
@@ -645,7 +721,6 @@ def balance_history(car_number):
                            transactions=txs)
 
 # ==================== API для APK ====================
-
 @flask_app.route('/api/driver/register', methods=['POST'])
 def api_register():
     try:
@@ -724,15 +799,23 @@ def api_login():
 
         update_online_status(car_number, 'online')
 
+        # ✅ ПОЛУЧАЕМ ТАРИФ ВОДИТЕЛЯ
+        tariff = get_driver_tariff(car_number)
+
         return jsonify({
             "success": True,
             "driver": {
-                "id":            driver['id'],
-                "name":          driver['full_name'],
-                "car":           driver['car_number'],
-                "balance":       driver['balance'] if driver['balance'] else 0.0,
-                "online_status": "online",
-                "last_seen":     datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                "id":      driver['id'],
+                "name":    driver['full_name'],
+                "car":     driver['car_number'],
+                "balance": driver['balance'] or 0.0,
+                # ✅ ТАРИФ ПЕРЕДАЁТСЯ В APK
+                "tariff": {
+                    "city_rate":   tariff['city_rate']   if tariff else 2800,
+                    "suburb_rate": tariff['suburb_rate'] if tariff else 3000,
+                    "base_fare":   tariff['base_fare']   if tariff else 5000,
+                    "wait_rate":   tariff['wait_rate']   if tariff else 500
+                }
             }
         }), 200
 
@@ -795,7 +878,6 @@ def api_get_balance():
         return jsonify({"success": False, "error": "Ошибка сервера"}), 500
 
 
-# ✅ НОВЫЙ API - Получить баланс + транзакции для APK
 @flask_app.route('/api/driver/balance/detail', methods=['POST'])
 def api_balance_detail():
     try:
@@ -819,11 +901,11 @@ def api_balance_detail():
             })
 
         return jsonify({
-            "success":       True,
-            "balance":       driver['balance'] or 0.0,
-            "car_number":    driver['car_number'],
-            "name":          driver['full_name'],
-            "transactions":  tx_list
+            "success":      True,
+            "balance":      driver['balance'] or 0.0,
+            "car_number":   driver['car_number'],
+            "name":         driver['full_name'],
+            "transactions": tx_list
         }), 200
 
     except Exception as e:
@@ -831,11 +913,9 @@ def api_balance_detail():
         return jsonify({"success": False, "error": "Ошибка сервера"}), 500
 
 
-# ✅ НОВЫЙ API - Пополнение баланса (для админа через API)
 @flask_app.route('/api/admin/balance/topup', methods=['POST'])
 def api_admin_topup():
     try:
-        # Простая защита через заголовок
         auth = request.headers.get('X-Admin-Key', '')
         if auth != SECRET_KEY:
             return jsonify({"success": False, "error": "Не авторизован"}), 401
@@ -862,7 +942,6 @@ def api_admin_topup():
         return jsonify({"success": False, "error": "Ошибка сервера"}), 500
 
 
-# ✅ НОВЫЙ API - Списание баланса (для APK автоматически)
 @flask_app.route('/api/admin/balance/deduct', methods=['POST'])
 def api_admin_deduct():
     try:
@@ -894,17 +973,19 @@ def api_admin_deduct():
     except Exception as e:
         logging.error(f"API deduct error: {e}")
         return jsonify({"success": False, "error": "Ошибка сервера"}), 500
-        
+
+
 @flask_app.route('/api/driver/update', methods=['POST'])
 def api_update_driver():
     try:
-        data        = request.get_json()
-        car_number  = data.get('car_number', '').strip().upper()
-        name        = data.get('name', '').strip()
-        phone       = data.get('phone', '').strip()
+        data       = request.get_json()
+        car_number = data.get('car_number', '').strip().upper()
+        name       = data.get('name', '').strip()
+        phone      = data.get('phone', '').strip()
 
         if not car_number or not name or not phone:
-            return jsonify({"success": False, "error": "Не все поля заполнены"}), 400
+            return jsonify({"success": False,
+                            "error": "Не все поля заполнены"}), 400
 
         conn = get_db()
         c = conn.cursor()
@@ -922,6 +1003,7 @@ def api_update_driver():
         logging.error(f"Update driver error: {e}")
         return jsonify({"success": False, "error": "Ошибка сервера"}), 500
 
+
 @flask_app.route('/api/driver/trip', methods=['POST'])
 def api_save_trip():
     try:
@@ -933,8 +1015,9 @@ def api_save_trip():
         waiting_seconds = data.get('waiting_seconds', 0)
         total_seconds   = data.get('total_seconds', 0)
 
-        # ✅ Время по Ташкенту (UTC+5)
-        tashkent_time = datetime.now(ZoneInfo("Asia/Tashkent")).strftime("%Y-%m-%d %H:%M:%S")
+        tashkent_time = datetime.now(
+            ZoneInfo("Asia/Tashkent")
+        ).strftime("%Y-%m-%d %H:%M:%S")
 
         conn = get_db()
         c    = conn.cursor()
@@ -943,26 +1026,18 @@ def api_save_trip():
             (car_number, price, city_distance, suburb_distance,
              waiting_seconds, total_seconds, created_at)
             VALUES (?, ?, ?, ?, ?, ?, ?)
-        """, (
-            car_number, 
-            price, 
-            city_distance, 
-            suburb_distance,
-            waiting_seconds, 
-            total_seconds,
-            tashkent_time                    # ← Исправлено
-        ))
+        """, (car_number, price, city_distance, suburb_distance,
+              waiting_seconds, total_seconds, tashkent_time))
         conn.commit()
         conn.close()
 
         add_log("trip", 0, 0,
-            f"Авто: {car_number} | "
-            f"Цена: {price:,} сум | "
-            f"Км: {city_distance:.1f}+{suburb_distance:.1f} | "
-            f"Время: {tashkent_time}"
-        )
-        
-        return jsonify({"success": True, "created_at": tashkent_time}), 200
+                f"Авто: {car_number} | "
+                f"Цена: {price:,} сум | "
+                f"Км: {city_distance:.1f}+{suburb_distance:.1f}")
+
+        return jsonify({"success": True,
+                        "created_at": tashkent_time}), 200
 
     except Exception as e:
         logging.error(f"Trip error: {e}")
@@ -975,11 +1050,9 @@ def api_get_driver_trips(car_number):
         conn = get_db()
         c    = conn.cursor()
 
-        # ✅ Получаем параметры дат
         date_from = request.args.get('date_from', '')
         date_to   = request.args.get('date_to',   '')
 
-        # ✅ Формируем запрос с фильтром
         query  = "SELECT * FROM trips WHERE car_number = ?"
         params = [car_number.upper()]
 
