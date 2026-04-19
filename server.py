@@ -1107,7 +1107,72 @@ def api_get_tariffs():
     except Exception as e:
         logging.error(f"Tariffs error: {e}")
         return jsonify({"success": False}), 500
+        
+        # ✅ СТРАНИЦА ТАРИФОВ
+@flask_app.route('/tariffs')
+@admin_required
+def tariffs_page():
+    tariffs = get_all_tariffs()
+    return render_template('tariffs.html', tariffs=tariffs)
 
+# ✅ СОЗДАТЬ ТАРИФ
+@flask_app.route('/tariffs/add', methods=['POST'])
+@admin_required
+def add_tariff():
+    name        = request.form.get('name', '').strip()
+    city_rate   = float(request.form.get('city_rate', 2800))
+    suburb_rate = float(request.form.get('suburb_rate', 3000))
+    base_fare   = float(request.form.get('base_fare', 5000))
+    wait_rate   = float(request.form.get('wait_rate', 500))
+
+    conn = get_db()
+    c = conn.cursor()
+    c.execute("""
+        INSERT INTO tariffs (name, city_rate, suburb_rate, base_fare, wait_rate)
+        VALUES (?, ?, ?, ?, ?)
+    """, (name, city_rate, suburb_rate, base_fare, wait_rate))
+    conn.commit()
+    conn.close()
+
+    add_log("add_tariff", 0, 0, f"Тариф: {name}")
+    return redirect(url_for('tariffs_page'))
+
+# ✅ ИЗМЕНИТЬ ТАРИФ
+@flask_app.route('/tariffs/edit', methods=['POST'])
+@admin_required
+def edit_tariff():
+    tariff_id   = request.form.get('tariff_id')
+    name        = request.form.get('name', '').strip()
+    city_rate   = float(request.form.get('city_rate', 2800))
+    suburb_rate = float(request.form.get('suburb_rate', 3000))
+    base_fare   = float(request.form.get('base_fare', 5000))
+    wait_rate   = float(request.form.get('wait_rate', 500))
+
+    conn = get_db()
+    c = conn.cursor()
+    c.execute("""
+        UPDATE tariffs
+        SET name=?, city_rate=?, suburb_rate=?, base_fare=?, wait_rate=?
+        WHERE id=?
+    """, (name, city_rate, suburb_rate, base_fare, wait_rate, tariff_id))
+    conn.commit()
+    conn.close()
+
+    add_log("edit_tariff", 0, 0, f"Тариф ID:{tariff_id} → {name}")
+    return redirect(url_for('tariffs_page'))
+
+# ✅ УДАЛИТЬ ТАРИФ
+@flask_app.route('/tariffs/delete/<int:tariff_id>')
+@admin_required
+def delete_tariff(tariff_id):
+    if tariff_id == 1:
+        return redirect(url_for('tariffs_page'))
+    conn = get_db()
+    c = conn.cursor()
+    c.execute("DELETE FROM tariffs WHERE id=?", (tariff_id,))
+    conn.commit()
+    conn.close()
+    return redirect(url_for('tariffs_page'))
 
 # ==================== ЗАПУСК ====================
 init_db()
