@@ -1108,6 +1108,43 @@ def api_get_tariffs():
         logging.error(f"Tariffs error: {e}")
         return jsonify({"success": False}), 500
         
+@flask_app.route('/api/tariffs', methods=['POST'])
+def api_save_tariffs():
+    try:
+        data = request.get_json()
+
+        city_rate   = float(data.get('city_rate',   2800))
+        suburb_rate = float(data.get('suburb_rate', 3000))
+        base_fare   = float(data.get('base_fare',   5000))
+        wait_rate   = float(data.get('wait_rate',    500))
+
+        conn = get_db()
+        c = conn.cursor()
+        
+        # Обновляем тариф ID=1 (основной)
+        c.execute("""
+            UPDATE tariffs
+            SET city_rate=?, suburb_rate=?, base_fare=?, wait_rate=?
+            WHERE id=1
+        """, (city_rate, suburb_rate, base_fare, wait_rate))
+        
+        conn.commit()
+        conn.close()
+
+        # Обновляем TaxiConfig в памяти
+        TaxiConfig.CITY_RATE   = city_rate
+        TaxiConfig.SUBURB_RATE = suburb_rate
+        TaxiConfig.BASE_FARE   = base_fare
+        TaxiConfig.WAIT_RATE   = wait_rate
+
+        add_log("api_save_tariffs", 0, 0, "Тарифы обновлены через Android")
+
+        return jsonify({"success": True, "message": "Тарифы сохранены"}), 200
+
+    except Exception as e:
+        logging.error(f"api_save_tariffs error: {e}")
+        return jsonify({"success": False, "message": str(e)}), 500
+        
         # ✅ СТРАНИЦА ТАРИФОВ
 @flask_app.route('/tariffs')
 @admin_required
