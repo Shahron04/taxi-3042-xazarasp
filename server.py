@@ -478,27 +478,52 @@ def get_all_drivers_balance():
 
 # ==================== ТАРИФЫ ====================
 def get_all_tariffs():
+    """Получить все тарифы из БД в виде списка словарей"""
     conn = get_db()
     c = conn.cursor()
-    c.execute("SELECT * FROM tariffs ORDER BY id")
-    tariffs = c.fetchall()
+    c.execute("SELECT id, name, city_rate, suburb_rate, base_fare, wait_rate FROM tariffs ORDER BY id")
+    rows = c.fetchall()
     conn.close()
-    return tariffs
+    
+    # Преобразуем tuple в dict для удобства в шаблоне
+    result = []
+    for r in rows:
+        result.append({
+            'id':          r[0],
+            'name':        r[1],
+            'city_rate':   r[2],
+            'suburb_rate': r[3],
+            'base_fare':   r[4],
+            'wait_rate':   r[5]
+        })
+    return result
 
 def get_driver_tariff(car_number):
+    """Получить тариф конкретного водителя"""
     conn = get_db()
     c = conn.cursor()
     c.execute("""
-        SELECT t.*
+        SELECT t.id, t.name, t.city_rate, t.suburb_rate, t.base_fare, t.wait_rate
         FROM drivers d
         LEFT JOIN tariffs t ON t.id = d.tariff_id
         WHERE d.car_number = ?
     """, (car_number.upper(),))
-    tariff = c.fetchone()
+    row = c.fetchone()
     conn.close()
-    return tariff
+    
+    if row:
+        return {
+            'id':          row[0],
+            'name':        row[1],
+            'city_rate':   row[2],
+            'suburb_rate': row[3],
+            'base_fare':   row[4],
+            'wait_rate':   row[5]
+        }
+    return None
 
 def set_driver_tariff(car_number, tariff_id):
+    """Назначить тариф водителю"""
     conn = get_db()
     c = conn.cursor()
     c.execute("""
@@ -507,7 +532,9 @@ def set_driver_tariff(car_number, tariff_id):
         WHERE car_number = ?
     """, (tariff_id, car_number.upper()))
     conn.commit()
+    affected = c.rowcount
     conn.close()
+    return affected > 0
 
 # ==================== FLASK ====================
 flask_app = Flask(__name__, template_folder='.')
