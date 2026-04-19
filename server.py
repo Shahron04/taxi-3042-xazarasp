@@ -182,20 +182,18 @@ def add_driver(tg_id, username, full_name, phone, car_number):
     conn.commit()
     conn.close()
 
-def reset_driver(car_number):
+def get_all_drivers():
     conn = get_db()
     c = conn.cursor()
     c.execute("""
-        UPDATE drivers
-        SET status = 'pending',
-            pin = NULL,
-            pin_created_at = NULL,
-            pin_expires_at = NULL,
-            online_status = 'offline'
-        WHERE car_number = ?
-    """, (car_number.upper(),))
-    conn.commit()
+        SELECT d.*, t.name as tariff_name
+        FROM drivers d
+        LEFT JOIN tariffs t ON t.id = d.tariff_id
+        ORDER BY d.created_at DESC
+    """)
+    drivers = c.fetchall()
     conn.close()
+    return drivers
 
 def get_driver_by_car(car_number):
     conn = get_db()
@@ -205,10 +203,16 @@ def get_driver_by_car(car_number):
     conn.close()
     return driver
 
-def get_all_drivers():
+def search_drivers(query):
     conn = get_db()
     c = conn.cursor()
-    c.execute("SELECT * FROM drivers ORDER BY created_at DESC")
+    c.execute("""
+        SELECT d.*, t.name as tariff_name
+        FROM drivers d
+        LEFT JOIN tariffs t ON t.id = d.tariff_id
+        WHERE d.full_name LIKE ? OR d.car_number LIKE ?
+        OR d.phone LIKE ? OR d.username LIKE ?
+    """, (f"%{query}%", f"%{query}%", f"%{query}%", f"%{query}%"))
     drivers = c.fetchall()
     conn.close()
     return drivers
@@ -542,19 +546,18 @@ def dashboard():
 @flask_app.route('/drivers')
 @admin_required
 def drivers():
-    query        = request.args.get('search', '')
-    drivers_list = search_drivers(query) if query else get_all_drivers()
-    tariffs      = get_all_tariffs()
+    query       = request.args.get('search', '')
+    drivers_raw = search_drivers(query) if query else get_all_drivers()
+    tariffs     = get_all_tariffs()
 
-    # ✅ добавляем имя тарифа каждому водителю
-    for d in drivers_list:
-        tariff = get_driver_tariff(d['car_number'])
-        if tariff:
-            d['tariff_name'] = tariff['name']
-            d['tariff_id']   = tariff['id']
-        else:
-            d['tariff_name'] = "Стандарт"
-            d['tariff_id']   = 1
+    drivers_list = []
+    for d in drivers_raw:
+        driver_dict = dict(d)
+        if not driver_dict.get('tariff_name'):
+            driver_dict['tariff_name'] = 'Стандарт'
+        if not driver_dict.get('tariff_id'):
+            driver_dict['tariff_id'] = 1
+        drivers_list.append(driver_dict)
 
     return render_template(
         'drivers.html',
@@ -562,7 +565,6 @@ def drivers():
         search=query,
         tariffs=tariffs
     )
-
 # ✅ СМЕНА ТАРИФА
 @flask_app.route('/driver/set_tariff', methods=['POST'])
 @admin_required
