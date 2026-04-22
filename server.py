@@ -1157,20 +1157,33 @@ def api_get_tariffs():
 def api_save_tariffs():
     try:
         data = request.get_json()
+        
+        print(f"📥 Получены данные: {data}")  # 🔍 Логирование
 
         city_rate   = float(data.get('city_rate',   TaxiConfig.CITY_RATE))
         suburb_rate = float(data.get('suburb_rate', TaxiConfig.SUBURB_RATE))
         base_fare   = float(data.get('base_fare',   TaxiConfig.BASE_FARE))
         wait_rate   = float(data.get('wait_rate',   TaxiConfig.WAIT_RATE))
+        
+        print(f"📊 Параметры: city={city_rate}, suburb={suburb_rate}, base={base_fare}, wait={wait_rate}")
 
         # ✅ Сохраняем в БД
         conn = get_db()
         c = conn.cursor()
+        
+        # 🔍 Проверяем что есть в БД
+        c.execute("SELECT * FROM tariffs WHERE id=1")
+        existing = c.fetchone()
+        print(f"📦 Текущие тарифы в БД: {existing}")
+        
         c.execute("""
             UPDATE tariffs
             SET city_rate=?, suburb_rate=?, base_fare=?, wait_rate=?
             WHERE id=1
         """, (city_rate, suburb_rate, base_fare, wait_rate))
+        
+        print(f"✅ Обновлено строк: {c.rowcount}")
+        
         conn.commit()
         conn.close()
 
@@ -1183,11 +1196,26 @@ def api_save_tariffs():
         add_log("api_save_tariffs", 0, 0,
                 f"Тарифы: город={city_rate} пригород={suburb_rate} мин={base_fare} ожидание={wait_rate}")
 
-        return jsonify({"success": True, "message": "Тарифы сохранены"}), 200
+        print(f"✅ api_save_tariffs успешно завершён")
+        
+        return jsonify({
+            "success": True, 
+            "message": "Тарифы сохранены",
+            "saved": {
+                "city_rate": city_rate,
+                "suburb_rate": suburb_rate,
+                "base_fare": base_fare,
+                "wait_rate": wait_rate
+            }
+        }), 200
 
     except Exception as e:
-        logging.error(f"api_save_tariffs error: {e}")
-        return jsonify({"success": False, "message": str(e)}), 500
+        print(f"❌ api_save_tariffs error: {e}")
+        logging.error(f"api_save_tariffs error: {e}", exc_info=True)
+        return jsonify({
+            "success": False, 
+            "message": str(e)
+        }), 500
 
 
 @flask_app.route('/tariffs/edit', methods=['POST'])
