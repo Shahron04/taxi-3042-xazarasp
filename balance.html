@@ -8,7 +8,6 @@
         * { margin:0; padding:0; box-sizing:border-box; }
         body { font-family: 'Segoe UI', sans-serif; background: #0f0f1a; color: #fff; min-height: 100vh; }
 
-        /* NAVBAR */
         .navbar { background: #1a1a2e; padding: 0 30px; display: flex; align-items: center; height: 60px; border-bottom: 1px solid #2a2a4a; position: sticky; top: 0; z-index: 100; }
         .nav-brand { font-size: 18px; font-weight: 700; color: #f5c518; margin-right: 30px; }
         .nav-links { display: flex; gap: 4px; flex: 1; }
@@ -16,20 +15,17 @@
         .nav-links a:hover { background: #2a2a4a; color: #fff; }
         .nav-links a.active { background: #f5c518; color: #000; font-weight: 600; }
 
-        /* MAIN */
         .main { padding: 28px 30px; max-width: 1400px; margin: 0 auto; }
         .page-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 24px; flex-wrap: wrap; gap: 15px; }
         .page-title { font-size: 26px; font-weight: 700; color: #f5c518; }
         .page-sub { font-size: 13px; color: #888; margin-top: 4px; }
 
-        /* STATS */
         .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px; }
         .stat-card { background: #1a1a2e; border: 1px solid #2a2a4a; border-radius: 14px; padding: 18px 20px; }
         .stat-icon { font-size: 28px; margin-bottom: 10px; }
         .stat-val { font-size: 24px; font-weight: 700; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .stat-lbl { font-size: 12px; color: #888; margin-top: 4px; }
 
-        /* CONTROLS */
         .controls { display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; align-items: center; }
         .search-wrap { position: relative; flex: 1; min-width: 220px; }
         .search-wrap input { width: 100%; padding: 10px 14px 10px 38px; background: #1a1a2e; border: 1px solid #2a2a4a; border-radius: 10px; color: #fff; font-size: 14px; outline: none; }
@@ -38,7 +34,6 @@
         select.filter { padding: 10px 14px; background: #1a1a2e; border: 1px solid #2a2a4a; border-radius: 10px; color: #fff; font-size: 13px; outline: none; cursor: pointer; }
         select.filter:focus { border-color: #f5c518; }
 
-        /* BUTTONS */
         .btn { padding: 10px 18px; border: none; border-radius: 10px; cursor: pointer; font-size: 13px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; transition: all 0.2s; text-decoration: none; }
         .btn-yellow { background: #f5c518; color: #000; }
         .btn-yellow:hover { background: #e0b015; }
@@ -52,7 +47,6 @@
         .btn-xs-blue { background: rgba(99,102,241,.15); color: #818cf8; }
         .btn-xs-blue:hover { background: rgba(99,102,241,.3); }
 
-        /* TABLE */
         .table-box { background: #1a1a2e; border: 1px solid #2a2a4a; border-radius: 14px; overflow: hidden; }
         .table-box-head { display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; border-bottom: 1px solid #2a2a4a; }
         .table-box-title { font-size: 15px; font-weight: 600; }
@@ -62,18 +56,15 @@
         tbody tr:hover { background: rgba(255,255,255,0.025); }
         tbody td { padding: 14px 16px; font-size: 14px; }
 
-        /* DRIVER INFO */
         .drv-info { display: flex; align-items: center; gap: 10px; }
         .drv-avatar { width: 38px; height: 38px; border-radius: 50%; background: linear-gradient(135deg, #f5c518, #ff7e35); display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 14px; color: #000; flex-shrink: 0; }
         .drv-name { font-weight: 600; font-size: 14px; }
         .drv-car { font-size: 12px; color: #888; margin-top: 2px; }
 
-        /* BALANCE */
         .bal-pos { color: #22c55e; font-weight: 700; font-size: 15px; }
         .bal-low { color: #f59e0b; font-weight: 700; font-size: 15px; }
         .bal-zero { color: #ef4444; font-weight: 700; font-size: 15px; }
 
-        /* BADGES */
         .badge { padding: 3px 9px; border-radius: 20px; font-size: 11px; font-weight: 600; }
         .badge-green { background: rgba(34,197,94,.15); color: #22c55e; }
         .badge-yellow { background: rgba(245,158,11,.15); color: #f59e0b; }
@@ -82,7 +73,6 @@
 
         .act-btns { display: flex; gap: 6px; flex-wrap: wrap; }
 
-        /* MODAL */
         .overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.65); z-index: 500; align-items: center; justify-content: center; backdrop-filter: blur(3px); }
         .overlay.on { display: flex; }
         .modal { background: #1a1a2e; border: 1px solid #2a2a4a; border-radius: 18px; padding: 28px; width: 460px; max-width: 95vw; animation: pop .25s ease; }
@@ -98,11 +88,9 @@
         .modal-foot { display: flex; gap: 10px; margin-top: 22px; }
         .modal-foot .btn { flex: 1; justify-content: center; }
 
-        /* EMPTY */
         .empty { text-align: center; padding: 50px 20px; color: #555; }
         .empty-icon { font-size: 48px; margin-bottom: 12px; }
 
-        /* TOAST */
         .toast { position: fixed; bottom: 24px; right: 24px; background: #1a1a2e; border: 1px solid #2a2a4a; border-radius: 10px; padding: 14px 18px; font-size: 13px; z-index: 9999; opacity: 0; transform: translateY(20px); transition: all .3s; display: flex; align-items: center; gap: 8px; }
         .toast.show { opacity: 1; transform: translateY(0); }
 
@@ -112,7 +100,6 @@
 </head>
 <body>
 
-<!-- NAVBAR -->
 <nav class="navbar">
     <div class="nav-brand">🚕 ТАКСИ 3042</div>
     <div class="nav-links">
@@ -126,10 +113,8 @@
     </div>
 </nav>
 
-<!-- MAIN -->
 <div class="main">
 
-    <!-- HEADER -->
     <div class="page-header">
         <div>
             <div class="page-title">💰 Баланс водителей</div>
@@ -140,7 +125,6 @@
         </button>
     </div>
 
-    <!-- STATS -->
     <div class="stats-grid">
         <div class="stat-card">
             <div class="stat-icon">💵</div>
@@ -164,7 +148,6 @@
         </div>
     </div>
 
-    <!-- CONTROLS -->
     <div class="controls">
         <div class="search-wrap">
             <span class="search-icon">🔍</span>
@@ -182,7 +165,6 @@
         <button class="btn btn-outline" onclick="location.reload()">🔄 Обновить</button>
     </div>
 
-    <!-- TABLE -->
     <div class="table-box">
         <div class="table-box-head">
             <div class="table-box-title">Список водителей</div>
@@ -211,7 +193,6 @@
                 data-car="{{ d.car_number|lower }}"
                 data-balance="{{ d.balance or 0 }}">
 
-                <!-- ВОДИТЕЛЬ -->
                 <td>
                     <div class="drv-info">
                         <div class="drv-avatar">
@@ -224,14 +205,12 @@
                     </div>
                 </td>
 
-                <!-- ✅ ТАРИФ -->
                 <td>
                     <span class="badge-tariff">
                         {{ d.tariff_name if d.tariff_name else 'Стандарт' }}
                     </span>
                 </td>
 
-                <!-- БАЛАНС -->
                 <td>
                     {% set bal = d.balance or 0 %}
                     {% if bal >= 50000 %}
@@ -247,20 +226,16 @@
                     {% endif %}
                 </td>
 
-                <!-- ПОЕЗДКИ -->
                 <td style="color:#aaa;">{{ d.trip_count or 0 }}</td>
 
-                <!-- ПОПОЛНЕНО -->
                 <td style="color:#22c55e;">
                     +{{ "{:,.0f}".format(d.total_topup or 0) }} сум
                 </td>
 
-                <!-- СПИСАНО -->
                 <td style="color:#ef4444;">
                     -{{ "{:,.0f}".format(d.total_spent or 0) }} сум
                 </td>
 
-                <!-- СТАТУС -->
                 <td>
                     {% set bal = d.balance or 0 %}
                     {% if bal >= 10000 %}
@@ -272,7 +247,6 @@
                     {% endif %}
                 </td>
 
-                <!-- ДЕЙСТВИЯ -->
                 <td>
                     <div class="act-btns">
                         <button class="btn-xs btn-xs-green"
@@ -303,7 +277,6 @@
     </div>
 </div>
 
-<!-- MODAL: ПОПОЛНЕНИЕ -->
 <div class="overlay" id="add-modal">
     <div class="modal">
         <div class="modal-title" style="color:#22c55e;">➕ Пополнение баланса</div>
@@ -347,7 +320,6 @@
     </div>
 </div>
 
-<!-- MODAL: СПИСАНИЕ -->
 <div class="overlay" id="deduct-modal">
     <div class="modal">
         <div class="modal-title" style="color:#ef4444;">📤 Списание с баланса</div>
@@ -390,24 +362,15 @@
     </div>
 </div>
 
-<!-- TOAST -->
 <div class="toast" id="toast">✅ <span id="toast-text">Готово</span></div>
 
 <script>
-function openModal(id) {
-    document.getElementById(id).classList.add('on');
-}
-function closeModal(id) {
-    document.getElementById(id).classList.remove('on');
-}
+function openModal(id) { document.getElementById(id).classList.add('on'); }
+function closeModal(id) { document.getElementById(id).classList.remove('on'); }
 document.querySelectorAll('.overlay').forEach(o => {
-    o.addEventListener('click', e => {
-        if (e.target === o) o.classList.remove('on');
-    });
+    o.addEventListener('click', e => { if (e.target === o) o.classList.remove('on'); });
 });
-function setAmt(fieldId, val) {
-    document.getElementById(fieldId).value = val;
-}
+function setAmt(fieldId, val) { document.getElementById(fieldId).value = val; }
 function openTopup(car, name) {
     document.getElementById('topup-car').value = car;
     document.getElementById('topup-amount').value = '';
@@ -416,34 +379,29 @@ function openTopup(car, name) {
 function openDeduct(car, name, balance) {
     document.getElementById('deduct-car').value = car;
     document.getElementById('deduct-name-show').value = name + ' (' + car + ')';
-    document.getElementById('deduct-bal-show').value =
-        balance.toLocaleString('ru-RU') + ' сум';
+    document.getElementById('deduct-bal-show').value = balance.toLocaleString('ru-RU') + ' сум';
     document.getElementById('deduct-amount').value = '';
     openModal('deduct-modal');
 }
 function filterTable() {
-    const q      = document.getElementById('search-input').value.toLowerCase();
+    const q = document.getElementById('search-input').value.toLowerCase();
     const filter = document.getElementById('status-filter').value;
-    const rows   = document.querySelectorAll('#table-body tr');
-    let visible  = 0;
-
+    const rows = document.querySelectorAll('#table-body tr');
+    let visible = 0;
     rows.forEach(row => {
         const name = row.dataset.name || '';
-        const car  = row.dataset.car  || '';
-        const bal  = parseFloat(row.dataset.balance || 0);
-
+        const car = row.dataset.car || '';
+        const bal = parseFloat(row.dataset.balance || 0);
         const matchQ = name.includes(q) || car.includes(q);
         let matchF = true;
-        if (filter === 'high')   matchF = bal >= 50000;
+        if (filter === 'high') matchF = bal >= 50000;
         if (filter === 'normal') matchF = bal >= 10000 && bal < 50000;
-        if (filter === 'low')    matchF = bal > 0 && bal < 10000;
-        if (filter === 'zero')   matchF = bal <= 0;
-
+        if (filter === 'low') matchF = bal > 0 && bal < 10000;
+        if (filter === 'zero') matchF = bal <= 0;
         const show = matchQ && matchF;
         row.style.display = show ? '' : 'none';
         if (show) visible++;
     });
-
     document.getElementById('count-label').textContent = 'Показано: ' + visible;
 }
 function showToast(text) {
