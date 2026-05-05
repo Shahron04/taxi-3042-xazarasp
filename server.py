@@ -30,11 +30,10 @@ def get_db():
     return conn
 
 def init_db():
-    print("🔧 Инициализация базы данных...")
+    print("Инициализация базы данных...")
     conn = get_db()
     c = conn.cursor()
 
-    # ✅ ВОДИТЕЛИ
     c.execute("""
         CREATE TABLE IF NOT EXISTS drivers (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -56,7 +55,6 @@ def init_db():
         )
     """)
 
-    # ✅ ДОБАВЛЯЕМ ПОЛЯ ЕСЛИ НЕ СУЩЕСТВУЕТ
     for col, definition in [
         ("balance",       "REAL DEFAULT 0.0"),
         ("online_status", "TEXT DEFAULT 'offline'"),
@@ -68,7 +66,6 @@ def init_db():
         except:
             pass
 
-    # ✅ ТАРИФЫ
     c.execute("""
         CREATE TABLE IF NOT EXISTS tariffs (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -80,7 +77,6 @@ def init_db():
         )
     """)
 
-    # ✅ СТАНДАРТНЫЙ ТАРИФ
     c.execute("SELECT COUNT(*) FROM tariffs")
     if c.fetchone()[0] == 0:
         c.execute("""
@@ -88,7 +84,6 @@ def init_db():
             VALUES ('Стандарт', 2800, 3000, 5000, 500)
         """)
 
-    # ✅ ЛОГИ
     c.execute("""
         CREATE TABLE IF NOT EXISTS logs (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -100,7 +95,6 @@ def init_db():
         )
     """)
 
-    # ✅ BROADCASTS
     c.execute("""
         CREATE TABLE IF NOT EXISTS broadcasts (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -110,7 +104,6 @@ def init_db():
         )
     """)
 
-    # ✅ ПОЕЗДКИ
     c.execute("""
         CREATE TABLE IF NOT EXISTS trips (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -124,7 +117,6 @@ def init_db():
         )
     """)
 
-    # ✅ ТРАНЗАКЦИИ
     c.execute("""
         CREATE TABLE IF NOT EXISTS transactions (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -138,7 +130,7 @@ def init_db():
 
     conn.commit()
     conn.close()
-    print("✅ База данных готова")
+    print("База данных готова")
 
 # ==================== ГЕНЕРАЦИЯ PIN ====================
 def generate_pin():
@@ -289,6 +281,18 @@ def reset_pin_by_car(car_number):
     conn.close()
     return pin
 
+def reset_driver(car_number):
+    """Сброс статуса водителя при переустановке APK"""
+    conn = get_db()
+    c = conn.cursor()
+    c.execute("""
+        UPDATE drivers
+        SET status = 'pending', pin = NULL, pin_created_at = NULL, pin_expires_at = NULL
+        WHERE car_number = ?
+    """, (car_number.upper(),))
+    conn.commit()
+    conn.close()
+
 def update_online_status(car_number, status):
     conn = get_db()
     c = conn.cursor()
@@ -330,18 +334,6 @@ def get_driver_trips(car_number):
     trips = c.fetchall()
     conn.close()
     return trips
-
-def search_drivers(query):
-    conn = get_db()
-    c = conn.cursor()
-    c.execute("""
-        SELECT * FROM drivers
-        WHERE full_name LIKE ? OR car_number LIKE ?
-        OR phone LIKE ? OR username LIKE ?
-    """, (f"%{query}%", f"%{query}%", f"%{query}%", f"%{query}%"))
-    drivers = c.fetchall()
-    conn.close()
-    return drivers
 
 def get_stats():
     conn = get_db()
@@ -395,6 +387,24 @@ def get_logs():
     logs = c.fetchall()
     conn.close()
     return logs
+
+def cleanup_stale_online():
+    """Переводит в offline тех, кто не отправлял heartbeat более 2 минут"""
+    threshold = (datetime.now() - timedelta(minutes=2)).strftime("%Y-%m-%d %H:%M:%S")
+    conn = get_db()
+    c = conn.cursor()
+    c.execute("""
+        UPDATE drivers
+        SET online_status = 'offline'
+        WHERE online_status = 'online'
+          AND last_seen IS NOT NULL
+          AND last_seen < ?
+    """, (threshold,))
+    affected = c.rowcount
+    conn.commit()
+    conn.close()
+    if affected > 0:
+        logging.info(f"Очистка: {affected} водитель(ей) переведены в offline")
 
 # ==================== БАЛАНС ====================
 def topup_driver_balance(car_number, amount, description="Пополнение баланса"):
@@ -478,14 +488,11 @@ def get_all_drivers_balance():
 
 # ==================== ТАРИФЫ ====================
 def get_all_tariffs():
-    """Получить все тарифы из БД в виде списка словарей"""
     conn = get_db()
     c = conn.cursor()
     c.execute("SELECT id, name, city_rate, suburb_rate, base_fare, wait_rate FROM tariffs ORDER BY id")
     rows = c.fetchall()
     conn.close()
-    
-    # Преобразуем tuple в dict для удобства в шаблоне
     result = []
     for r in rows:
         result.append({
@@ -499,7 +506,6 @@ def get_all_tariffs():
     return result
 
 def get_driver_tariff(car_number):
-    """Получить тариф конкретного водителя"""
     conn = get_db()
     c = conn.cursor()
     c.execute("""
@@ -510,7 +516,6 @@ def get_driver_tariff(car_number):
     """, (car_number.upper(),))
     row = c.fetchone()
     conn.close()
-    
     if row:
         return {
             'id':          row[0],
@@ -523,7 +528,6 @@ def get_driver_tariff(car_number):
     return None
 
 def set_driver_tariff(car_number, tariff_id):
-    """Назначить тариф водителю"""
     conn = get_db()
     c = conn.cursor()
     c.execute("""
@@ -567,12 +571,13 @@ def logout():
 @flask_app.route('/')
 @admin_required
 def dashboard():
+    cleanup_stale_online()
     return render_template('dashboard.html', stats=get_stats())
 
-# ✅ DRIVERS С ТАРИФАМИ
 @flask_app.route('/drivers')
 @admin_required
 def drivers():
+    cleanup_stale_online()
     query       = request.args.get('search', '')
     drivers_raw = search_drivers(query) if query else get_all_drivers()
     tariffs     = get_all_tariffs()
@@ -592,20 +597,17 @@ def drivers():
         search=query,
         tariffs=tariffs
     )
-# ✅ СМЕНА ТАРИФА
+
 @flask_app.route('/driver/set_tariff', methods=['POST'])
 @admin_required
 def web_set_tariff():
     car_number = request.form.get('car_number', '').strip().upper()
     tariff_id  = request.form.get('tariff_id')
-
     if not car_number or not tariff_id:
         return redirect(url_for('drivers'))
-
     set_driver_tariff(car_number, tariff_id)
     add_log("set_tariff", 0, 0,
             f"Авто: {car_number} | Тариф ID: {tariff_id}")
-
     return redirect(url_for('drivers'))
 
 @flask_app.route('/requests')
@@ -659,6 +661,7 @@ def web_reset_pin(car_number):
 @flask_app.route('/stats')
 @admin_required
 def stats():
+    cleanup_stale_online()
     return render_template('stats.html', stats=get_stats(), logs=get_logs())
 
 @flask_app.route('/trips')
@@ -670,20 +673,17 @@ def trips_page():
     c    = conn.cursor()
     if car and date:
         c.execute("""
-            SELECT * FROM trips
-            WHERE car_number = ? AND created_at LIKE ?
+            SELECT * FROM trips WHERE car_number = ? AND created_at LIKE ?
             ORDER BY created_at DESC
         """, (car, f"{date}%"))
     elif car:
         c.execute("""
-            SELECT * FROM trips
-            WHERE car_number = ?
+            SELECT * FROM trips WHERE car_number = ?
             ORDER BY created_at DESC
         """, (car,))
     elif date:
         c.execute("""
-            SELECT * FROM trips
-            WHERE created_at LIKE ?
+            SELECT * FROM trips WHERE created_at LIKE ?
             ORDER BY created_at DESC
         """, (f"{date}%",))
     else:
@@ -696,6 +696,41 @@ def trips_page():
 @admin_required
 def broadcast():
     return render_template('broadcast.html')
+
+@flask_app.route('/tariffs')
+@admin_required
+def tariffs_page():
+    tariffs = get_all_tariffs()
+    return render_template('tariffs.html', tariffs=tariffs)
+
+@flask_app.route('/tariffs/edit', methods=['POST'])
+@admin_required
+def edit_tariff():
+    tariff_id   = request.form.get('tariff_id')
+    name        = request.form.get('name', '').strip()
+    city_rate   = float(request.form.get('city_rate',   2800))
+    suburb_rate = float(request.form.get('suburb_rate', 3000))
+    base_fare   = float(request.form.get('base_fare',   5000))
+    wait_rate   = float(request.form.get('wait_rate',    500))
+
+    conn = get_db()
+    c = conn.cursor()
+    c.execute("""
+        UPDATE tariffs
+        SET name=?, city_rate=?, suburb_rate=?, base_fare=?, wait_rate=?
+        WHERE id=?
+    """, (name, city_rate, suburb_rate, base_fare, wait_rate, tariff_id))
+    conn.commit()
+    conn.close()
+
+    if str(tariff_id) == '1':
+        TaxiConfig.CITY_RATE   = city_rate
+        TaxiConfig.SUBURB_RATE = suburb_rate
+        TaxiConfig.BASE_FARE   = base_fare
+        TaxiConfig.WAIT_RATE   = wait_rate
+
+    add_log("edit_tariff", 0, 0, f"Тариф ID:{tariff_id} -> {name}")
+    return redirect(url_for('tariffs_page'))
 
 # ==================== БАЛАНС ROUTES ====================
 @flask_app.route('/balance')
@@ -713,10 +748,8 @@ def web_topup():
     car_number  = request.form.get('car_number', '').strip().upper()
     amount      = float(request.form.get('amount', 0))
     description = request.form.get('description', 'Пополнение баланса').strip()
-
     if not car_number or amount <= 0:
         return redirect(url_for('balance_page'))
-
     new_balance = topup_driver_balance(car_number, amount, description)
     add_log("topup", 0, 0,
             f"Авто: {car_number} | Сумма: {amount:,.0f} сум | "
@@ -729,10 +762,8 @@ def web_deduct():
     car_number  = request.form.get('car_number', '').strip().upper()
     amount      = float(request.form.get('amount', 0))
     description = request.form.get('description', 'Списание').strip()
-
     if not car_number or amount <= 0:
         return redirect(url_for('balance_page'))
-
     ok, msg, new_balance = deduct_driver_balance(car_number, amount, description)
     if ok:
         add_log("deduct", 0, 0,
@@ -749,7 +780,7 @@ def balance_history(car_number):
                            driver=driver,
                            transactions=txs)
 
-# ==================== API для APK ====================
+# ==================== API ДЛЯ APK ====================
 @flask_app.route('/api/driver/register', methods=['POST'])
 def api_register():
     try:
@@ -787,7 +818,6 @@ def api_register():
     except Exception as e:
         logging.error(f"Register error: {e}")
         return jsonify({"success": False, "error": "Ошибка сервера"}), 500
-
 
 @flask_app.route('/api/driver/login', methods=['POST'])
 def api_login():
@@ -828,7 +858,6 @@ def api_login():
 
         update_online_status(car_number, 'online')
 
-        # ✅ ПОЛУЧАЕМ ТАРИФ ВОДИТЕЛЯ
         tariff = get_driver_tariff(car_number)
 
         return jsonify({
@@ -838,7 +867,6 @@ def api_login():
                 "name":    driver['full_name'],
                 "car":     driver['car_number'],
                 "balance": driver['balance'] or 0.0,
-                # ✅ ТАРИФ ПЕРЕДАЁТСЯ В APK
                 "tariff": {
                     "city_rate":   tariff['city_rate']   if tariff else 2800,
                     "suburb_rate": tariff['suburb_rate'] if tariff else 3000,
@@ -851,7 +879,6 @@ def api_login():
     except Exception as e:
         logging.error(f"Login error: {e}")
         return jsonify({"success": False, "error": "Ошибка сервера"}), 500
-
 
 @flask_app.route('/api/driver/check/<car_number>', methods=['GET'])
 def api_check_driver(car_number):
@@ -874,7 +901,6 @@ def api_check_driver(car_number):
         logging.error(f"Check error: {e}")
         return jsonify({"success": False, "is_blocked": True}), 500
 
-
 @flask_app.route('/api/driver/status', methods=['POST'])
 def api_update_status():
     try:
@@ -893,6 +919,32 @@ def api_update_status():
         logging.error(f"Status error: {e}")
         return jsonify({"success": False, "error": "Ошибка сервера"}), 500
 
+@flask_app.route('/api/driver/heartbeat', methods=['POST'])
+def api_heartbeat():
+    """APK вызывает каждые 30 сек, обновляет last_seen"""
+    try:
+        data       = request.get_json()
+        car_number = data.get('car_number', '').strip().upper()
+
+        if not car_number:
+            return jsonify({"success": False}), 400
+
+        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        conn = get_db()
+        c = conn.cursor()
+        c.execute("""
+            UPDATE drivers
+            SET last_seen = ?
+            WHERE car_number = ? AND online_status = 'online'
+        """, (now, car_number))
+        conn.commit()
+        conn.close()
+
+        return jsonify({"success": True}), 200
+
+    except Exception as e:
+        logging.error(f"Heartbeat error: {e}")
+        return jsonify({"success": False}), 500
 
 @flask_app.route('/api/driver/balance', methods=['POST'])
 def api_get_balance():
@@ -905,7 +957,6 @@ def api_get_balance():
     except Exception as e:
         logging.error(f"Balance error: {e}")
         return jsonify({"success": False, "error": "Ошибка сервера"}), 500
-
 
 @flask_app.route('/api/driver/balance/detail', methods=['POST'])
 def api_balance_detail():
@@ -941,7 +992,6 @@ def api_balance_detail():
         logging.error(f"Balance detail error: {e}")
         return jsonify({"success": False, "error": "Ошибка сервера"}), 500
 
-
 @flask_app.route('/api/admin/balance/topup', methods=['POST'])
 def api_admin_topup():
     try:
@@ -969,7 +1019,6 @@ def api_admin_topup():
     except Exception as e:
         logging.error(f"API topup error: {e}")
         return jsonify({"success": False, "error": "Ошибка сервера"}), 500
-
 
 @flask_app.route('/api/admin/balance/deduct', methods=['POST'])
 def api_admin_deduct():
@@ -1003,7 +1052,6 @@ def api_admin_deduct():
         logging.error(f"API deduct error: {e}")
         return jsonify({"success": False, "error": "Ошибка сервера"}), 500
 
-
 @flask_app.route('/api/driver/update', methods=['POST'])
 def api_update_driver():
     try:
@@ -1031,7 +1079,6 @@ def api_update_driver():
     except Exception as e:
         logging.error(f"Update driver error: {e}")
         return jsonify({"success": False, "error": "Ошибка сервера"}), 500
-
 
 @flask_app.route('/api/driver/trip', methods=['POST'])
 def api_save_trip():
@@ -1071,7 +1118,6 @@ def api_save_trip():
     except Exception as e:
         logging.error(f"Trip error: {e}")
         return jsonify({"success": False, "error": "Ошибка сервера"}), 500
-
 
 @flask_app.route('/api/driver/trips/<car_number>', methods=['GET'])
 def api_get_driver_trips(car_number):
@@ -1120,11 +1166,9 @@ def api_get_driver_trips(car_number):
         logging.error(f"Trips error: {e}")
         return jsonify({"success": False, "error": "Ошибка сервера"}), 500
 
-
 @flask_app.route('/api/tariffs', methods=['GET'])
 def api_get_tariffs():
     try:
-        # ✅ Берём из БД, а не из TaxiConfig
         conn = get_db()
         c = conn.cursor()
         c.execute("SELECT city_rate, suburb_rate, base_fare, wait_rate FROM tariffs WHERE id=1")
@@ -1152,42 +1196,26 @@ def api_get_tariffs():
         logging.error(f"Tariffs error: {e}")
         return jsonify({"success": False}), 500
 
-
 @flask_app.route('/api/tariffs', methods=['POST'])
 def api_save_tariffs():
     try:
         data = request.get_json()
-        
-        print(f"📥 Получены данные: {data}")  # 🔍 Логирование
 
         city_rate   = float(data.get('city_rate',   TaxiConfig.CITY_RATE))
         suburb_rate = float(data.get('suburb_rate', TaxiConfig.SUBURB_RATE))
         base_fare   = float(data.get('base_fare',   TaxiConfig.BASE_FARE))
         wait_rate   = float(data.get('wait_rate',   TaxiConfig.WAIT_RATE))
-        
-        print(f"📊 Параметры: city={city_rate}, suburb={suburb_rate}, base={base_fare}, wait={wait_rate}")
 
-        # ✅ Сохраняем в БД
         conn = get_db()
         c = conn.cursor()
-        
-        # 🔍 Проверяем что есть в БД
-        c.execute("SELECT * FROM tariffs WHERE id=1")
-        existing = c.fetchone()
-        print(f"📦 Текущие тарифы в БД: {existing}")
-        
         c.execute("""
             UPDATE tariffs
             SET city_rate=?, suburb_rate=?, base_fare=?, wait_rate=?
             WHERE id=1
         """, (city_rate, suburb_rate, base_fare, wait_rate))
-        
-        print(f"✅ Обновлено строк: {c.rowcount}")
-        
         conn.commit()
         conn.close()
 
-        # ✅ Обновляем TaxiConfig в памяти
         TaxiConfig.CITY_RATE   = city_rate
         TaxiConfig.SUBURB_RATE = suburb_rate
         TaxiConfig.BASE_FARE   = base_fare
@@ -1196,10 +1224,8 @@ def api_save_tariffs():
         add_log("api_save_tariffs", 0, 0,
                 f"Тарифы: город={city_rate} пригород={suburb_rate} мин={base_fare} ожидание={wait_rate}")
 
-        print(f"✅ api_save_tariffs успешно завершён")
-        
         return jsonify({
-            "success": True, 
+            "success": True,
             "message": "Тарифы сохранены",
             "saved": {
                 "city_rate": city_rate,
@@ -1210,48 +1236,14 @@ def api_save_tariffs():
         }), 200
 
     except Exception as e:
-        print(f"❌ api_save_tariffs error: {e}")
         logging.error(f"api_save_tariffs error: {e}", exc_info=True)
         return jsonify({
-            "success": False, 
+            "success": False,
             "message": str(e)
         }), 500
 
-
-@flask_app.route('/tariffs/edit', methods=['POST'])
-@admin_required
-def edit_tariff():
-    tariff_id   = request.form.get('tariff_id')
-    name        = request.form.get('name', '').strip()
-    city_rate   = float(request.form.get('city_rate',   2800))
-    suburb_rate = float(request.form.get('suburb_rate', 3000))
-    base_fare   = float(request.form.get('base_fare',   5000))
-    wait_rate   = float(request.form.get('wait_rate',    500))
-
-    conn = get_db()
-    c = conn.cursor()
-    c.execute("""
-        UPDATE tariffs
-        SET name=?, city_rate=?, suburb_rate=?, base_fare=?, wait_rate=?
-        WHERE id=?
-    """, (name, city_rate, suburb_rate, base_fare, wait_rate, tariff_id))
-    conn.commit()
-    conn.close()
-
-    # ✅ Если редактируем ID=1 — обновляем TaxiConfig
-    if str(tariff_id) == '1':
-        TaxiConfig.CITY_RATE   = city_rate
-        TaxiConfig.SUBURB_RATE = suburb_rate
-        TaxiConfig.BASE_FARE   = base_fare
-        TaxiConfig.WAIT_RATE   = wait_rate
-
-    add_log("edit_tariff", 0, 0, f"Тариф ID:{tariff_id} → {name}")
-    return redirect(url_for('tariffs_page'))
-
-
 # ==================== ЗАПУСК ====================
 def init_taxiconfig_from_db():
-    """При старте загружаем тарифы из БД в TaxiConfig"""
     try:
         conn = get_db()
         c = conn.cursor()
@@ -1264,12 +1256,12 @@ def init_taxiconfig_from_db():
             TaxiConfig.SUBURB_RATE = row[1]
             TaxiConfig.BASE_FARE   = row[2]
             TaxiConfig.WAIT_RATE   = row[3]
-            logging.info(f"✅ TaxiConfig загружен из БД: город={row[0]} пригород={row[1]}")
+            logging.info(f"TaxiConfig загружен из БД: город={row[0]} пригород={row[1]}")
     except Exception as e:
-        logging.error(f"❌ init_taxiconfig_from_db error: {e}")
+        logging.error(f"init_taxiconfig_from_db error: {e}")
 
 init_db()
-init_taxiconfig_from_db()  # ← ДОБАВЬ ЭТУ СТРОКУ
+init_taxiconfig_from_db()
 app = flask_app
 
 if __name__ == "__main__":
