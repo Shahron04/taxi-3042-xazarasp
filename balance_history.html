@@ -133,7 +133,6 @@
 <div class="main">
     <a href="/balance" class="back-btn">← Назад к балансам</a>
 
-    <!-- ВОДИТЕЛЬ -->
     {% if driver %}
     <div class="driver-card">
         <div class="d-avatar">{{ (driver.full_name or 'X')[0]|upper }}</div>
@@ -152,7 +151,6 @@
     </div>
     {% endif %}
 
-    <!-- ИСТОРИЯ -->
     <div class="section-title">
         📋 История транзакций
         ({{ transactions|length }})
@@ -167,7 +165,8 @@
             </div>
             <div class="tx-body">
                 <div class="tx-desc">{{ tx.description or '—' }}</div>
-                <div class="tx-date">{{ tx.created_at }}</div>
+                <!-- ✅ ИСПРАВЛЕНА ДАТА ДЛЯ POSTGRESQL -->
+                <div class="tx-date">{{ tx.created_at.strftime('%Y-%m-%d %H:%M') if tx.created_at else '—' }}</div>
             </div>
             <div class="tx-amount {{ 'in' if tx.type == 'credit' else 'out' }}">
                 {{ '+' if tx.type == 'credit' else '-' }}{{ "{:,.0f}".format(tx.amount) }} сум
