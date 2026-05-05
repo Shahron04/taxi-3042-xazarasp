@@ -6,9 +6,11 @@
     <title>Taxi 3042 — Dashboard</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { background: #1a1a1a; font-family: Arial, sans-serif; color: #fff; }
+        body { background: #111; font-family: Arial, sans-serif; color: #fff; }
+
+        /* ── ШАПКА ── */
         .header {
-            background: #2a2a2a;
+            background: #1a1a1a;
             padding: 16px 24px;
             display: flex;
             justify-content: space-between;
@@ -17,121 +19,218 @@
             flex-wrap: wrap;
             gap: 12px;
         }
-        .header h1 { color: #FAD201; font-size: 22px; }
+        .header h1 { color: #FAD201; font-size: 22px; letter-spacing: 2px; }
         .nav { display: flex; align-items: center; flex-wrap: wrap; gap: 4px; }
         .nav a {
-            color: #fff;
+            color: #ccc;
             text-decoration: none;
             padding: 6px 14px;
             font-size: 14px;
             border-radius: 6px;
-            transition: background 0.2s;
+            transition: all 0.2s;
         }
         .nav a:hover { color: #FAD201; background: rgba(250,210,1,0.08); }
         .nav a.active { color: #000; background: #FAD201; font-weight: bold; }
         .logout { color: #ff4444 !important; }
-        .logout:hover { background: rgba(255,68,68,0.1) !important; color: #ff6666 !important; }
-        .content { padding: 30px; max-width: 1200px; margin: 0 auto; }
+        .logout:hover { background: rgba(255,68,68,0.1) !important; }
+
+        /* ── КОНТЕНТ ── */
+        .content { padding: 30px; max-width: 1300px; margin: 0 auto; }
+
+        .page-title {
+            font-size: 20px;
+            color: #aaa;
+            margin-bottom: 24px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid #2a2a2a;
+        }
+        .page-title span { color: #FAD201; }
+
+        /* ── СЕКЦИИ ── */
+        .section-title {
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: #555;
+            margin: 24px 0 12px;
+        }
+
+        /* ── КАРТОЧКИ ── */
         .stats {
             display: grid;
             grid-template-columns: repeat(4, 1fr);
-            gap: 16px;
-            margin-bottom: 30px;
+            gap: 14px;
+            margin-bottom: 8px;
         }
+        .stats-3 { grid-template-columns: repeat(3, 1fr); }
+        .stats-2 { grid-template-columns: repeat(2, 1fr); }
+
         .stat-card {
-            background: #2a2a2a;
-            padding: 20px;
+            background: #1e1e1e;
+            padding: 20px 16px;
             border-radius: 12px;
             text-align: center;
-            border: 1px solid #333;
-            transition: transform 0.2s, border-color 0.2s;
+            border: 1px solid #2a2a2a;
+            transition: all 0.2s;
+            position: relative;
+            overflow: hidden;
         }
-        .stat-card:hover { transform: translateY(-2px); border-color: #444; }
+        .stat-card::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            height: 3px;
+            background: var(--accent, #FAD201);
+            opacity: 0.6;
+        }
+        .stat-card:hover {
+            transform: translateY(-3px);
+            border-color: #333;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+        }
+        .stat-card .icon {
+            font-size: 24px;
+            margin-bottom: 8px;
+        }
         .stat-card .number {
-            font-size: 38px;
+            font-size: 36px;
             font-weight: bold;
-            color: #FAD201;
+            color: var(--accent, #FAD201);
+            line-height: 1;
         }
         .stat-card .label {
-            color: #888;
-            margin-top: 6px;
-            font-size: 13px;
+            color: #666;
+            margin-top: 8px;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
         }
-@media (max-width: 900px) {
-    .stats { grid-template-columns: repeat(2, 1fr); }
-}
-@media (max-width: 480px) {
-    .stats { grid-template-columns: 1fr; }
-}
+
+        /* ── ЦВЕТА ── */
+        .yellow { --accent: #FAD201; }
+        .green  { --accent: #4CAF50; }
+        .orange { --accent: #ff9800; }
+        .red    { --accent: #f44336; }
+        .blue   { --accent: #2196F3; }
+        .purple { --accent: #9C27B0; }
+        .gray   { --accent: #607D8B; }
+        .teal   { --accent: #009688; }
+
+        /* ── АДАПТИВ ── */
+        @media (max-width: 1000px) {
+            .stats { grid-template-columns: repeat(2, 1fr); }
+            .stats-3 { grid-template-columns: repeat(2, 1fr); }
+        }
+        @media (max-width: 500px) {
+            .stats, .stats-3, .stats-2 { grid-template-columns: 1fr 1fr; }
+            .content { padding: 16px; }
+            .stat-card .number { font-size: 28px; }
+        }
     </style>
 </head>
 <body>
-    <div class="header">
-        <h1>TAXI 3042</h1>
-        <div class="nav">
-            <a href="/" class="active">Главная</a>
-            <a href="/drivers">Водители</a>
-            <a href="/requests">Заявки</a>
-            <a href="/trips">Поездки</a>
-            <a href="/balance">Баланс</a>
-            <a href="/tariffs">Тарифы</a>
-            <a href="/stats">Статистика</a>
-            <a href="/broadcast">Рассылка</a>
-            <a href="/logout" class="logout">Выйти</a>
+
+<div class="header">
+    <h1>🚖 TAXI 3042</h1>
+    <div class="nav">
+        <a href="/" class="active">Главная</a>
+        <a href="/drivers">Водители</a>
+        <a href="/requests">Заявки</a>
+        <a href="/trips">Поездки</a>
+        <a href="/balance">Баланс</a>
+        <a href="/tariffs">Тарифы</a>
+        <a href="/stats">Статистика</a>
+        <a href="/broadcast">Рассылка</a>
+        <a href="/logout" class="logout">Выйти</a>
+    </div>
+</div>
+
+<div class="content">
+
+    <div class="page-title">
+        Dashboard — <span>Обзор системы</span>
+    </div>
+
+    <!-- ВОДИТЕЛИ -->
+    <div class="section-title">👥 Водители</div>
+    <div class="stats">
+        <div class="stat-card yellow">
+            <div class="icon">🚗</div>
+            <div class="number">{{ stats.total }}</div>
+            <div class="label">Всего водителей</div>
+        </div>
+        <div class="stat-card green">
+            <div class="icon">✅</div>
+            <div class="number">{{ stats.approved }}</div>
+            <div class="label">Одобрено</div>
+        </div>
+        <div class="stat-card orange">
+            <div class="icon">⏳</div>
+            <div class="number">{{ stats.pending }}</div>
+            <div class="label">Ожидают проверки</div>
+        </div>
+        <div class="stat-card red">
+            <div class="icon">❌</div>
+            <div class="number">{{ stats.rejected }}</div>
+            <div class="label">Отклонено</div>
         </div>
     </div>
-    <div class="content">
-        <h2 style="margin-bottom:20px;">Главная</h2>
-        <div class="stats">
-            <div class="stat-card">
-                <div class="number">{{ stats.total }}</div>
-                <div class="label">Всего водителей</div>
-            </div>
-            <div class="stat-card">
-                <div class="number" style="color:#4CAF50;">{{ stats.approved }}</div>
-                <div class="label">Одобрено</div>
-            </div>
-            <div class="stat-card">
-                <div class="number" style="color:#ff9800;">{{ stats.pending }}</div>
-                <div class="label">Ожидают</div>
-            </div>
-            <div class="stat-card">
-                <div class="number" style="color:#f44336;">{{ stats.rejected }}</div>
-                <div class="label">Отклонено</div>
-            </div>
-            <div class="stat-card">
-                <div class="number" style="color:#f44336;">{{ stats.blocked }}</div>
-                <div class="label">Заблокировано</div>
-            </div>
-            <div class="stat-card">
-                <div class="number" style="color:#2196F3;">{{ stats.today }}</div>
-                <div class="label">Регистраций сегодня</div>
-            </div>
-            <div class="stat-card">
-                <div class="number" style="color:#4CAF50;">{{ stats.online }}</div>
-                <div class="label">Сейчас онлайн</div>
-            </div>
-            <div class="stat-card">
-                <div class="number" style="color:#FAD201;">{{ stats.trips_today }}</div>
-                <div class="label">Поездок сегодня</div>
-            </div>
-            <div class="stat-card">
-                <div class="number" style="color:#FAD201;">{{ '{:,.0f}'.format(stats.earnings_today) }}</div>
-                <div class="label">Доход сегодня (сум)</div>
-            </div>
-            <div class="stat-card">
-                <div class="number" style="color:#9C27B0;">{{ '{:,.0f}'.format(stats.total_balance) }}</div>
-                <div class="label">Общий баланс (сум)</div>
-            </div>
-            <div class="stat-card">
-                <div class="number" style="color:#ff9800;">{{ stats.low_balance_count }}</div>
-                <div class="label">Мало баланса (&lt;10k)</div>
-            </div>
-            <div class="stat-card">
-                <div class="number" style="color:#607D8B;">{{ stats.trips_total }}</div>
-                <div class="label">Всего поездок</div>
-            </div>
+
+    <!-- АКТИВНОСТЬ -->
+    <div class="section-title">📡 Активность</div>
+    <div class="stats stats-3">
+        <div class="stat-card red">
+            <div class="icon">🚫</div>
+            <div class="number">{{ stats.blocked }}</div>
+            <div class="label">Заблокировано</div>
+        </div>
+        <div class="stat-card blue">
+            <div class="icon">📝</div>
+            <div class="number">{{ stats.today }}</div>
+            <div class="label">Регистраций сегодня</div>
+        </div>
+        <div class="stat-card green">
+            <div class="icon">🟢</div>
+            <div class="number">{{ stats.online }}</div>
+            <div class="label">Сейчас онлайн</div>
         </div>
     </div>
+
+    <!-- ПОЕЗДКИ -->
+    <div class="section-title">🛣️ Поездки</div>
+    <div class="stats stats-2">
+        <div class="stat-card yellow">
+            <div class="icon">🚀</div>
+            <div class="number">{{ stats.trips_today }}</div>
+            <div class="label">Поездок сегодня</div>
+        </div>
+        <div class="stat-card gray">
+            <div class="icon">📊</div>
+            <div class="number">{{ stats.trips_total }}</div>
+            <div class="label">Всего поездок</div>
+        </div>
+    </div>
+
+    <!-- ФИНАНСЫ -->
+    <div class="section-title">💰 Финансы</div>
+    <div class="stats stats-3">
+        <div class="stat-card yellow">
+            <div class="icon">💵</div>
+            <div class="number">{{ '{:,.0f}'.format(stats.earnings_today) }}</div>
+            <div class="label">Доход сегодня (сум)</div>
+        </div>
+        <div class="stat-card purple">
+            <div class="icon">🏦</div>
+            <div class="number">{{ '{:,.0f}'.format(stats.total_balance) }}</div>
+            <div class="label">Баланс водителей (сум)</div>
+        </div>
+        <div class="stat-card orange">
+            <div class="icon">⚠️</div>
+            <div class="number">{{ stats.low_balance_count }}</div>
+            <div class="label">Мало баланса (&lt;10k)</div>
+        </div>
+    </div>
+
+</div>
 </body>
 </html>
